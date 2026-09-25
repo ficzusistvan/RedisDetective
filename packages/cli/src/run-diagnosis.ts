@@ -2,6 +2,7 @@ import { buildEvidenceGraph } from '@redis-detective/evidence';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
+  GitHubAuthConfigError,
   GitHubAuthError,
   GitHubRateLimitError,
   findCandidateCommits,
@@ -42,26 +43,31 @@ export interface RunDiagnosisRequest {
   readonly databases: readonly number[] | null;
   readonly redactKeys: boolean;
   /**
-   * Repository to search for candidate commits. `null` or omitted records a `no-repository-connected`
-   * gap (when the Redis Cause bar is met) and leaves `commitCandidates` empty — the Redis diagnosis
-   * is still produced.
+   * Connected repository for candidate commits. `null` or omitted records a
+   * `no-repository-connected` gap (when the Redis Cause bar is met) and leaves `commitCandidates`
+   * empty — the Redis diagnosis is still produced.
    */
   readonly repository?: GitHubRepositoryRef | null;
   /**
    * When set, commit lookup is skipped and a `github-unavailable` gap is recorded. Used when the
-   * operator asked for `--repo` but App auth failed before a commit source existed. The Redis
-   * diagnosis still runs.
+   * operator asked for `--repo` but auth failed before a commit source existed. Prefer letting
+   * `createCommitSource` fail inside this function once ≥2 snapshots exist — that is the exit-6
+   * path. Pre-set detail remains for tests.
    */
   readonly githubUnavailableDetail?: string;
   /** How far before the graph window to search. Defaults to seven days. */
   readonly lookbackMs?: number;
   readonly maxCommitResults?: number;
   /**
-   * Injected GitHub read surface. Required when `repository` is set, there are at least two
-   * snapshots, and `githubUnavailableDetail` is absent; ignored otherwise. Tests pass a fake;
-   * production passes a REST source.
+   * Ready-made GitHub read surface. When set, used instead of `createCommitSource`. Tests pass a
+   * fake; production usually passes `createCommitSource` so auth runs only after ≥2 snapshots.
    */
   readonly commitSource?: GitHubCommitSource;
+  /**
+   * Lazily builds the GitHub read surface. Called only when a Connected repository is set, there
+   * are at least two snapshots, `commitSource` is absent, and `githubUnavailableDetail` is absent.
+   */
+  readonly createCommitSource?: () => Promise<GitHubCommitSource>;
   /**
    * Injected model. Omit for the deterministic paragraph. Production passes a client only when
    * `LLM_API_KEY` is set; tests omit this so they never reach a provider.
@@ -73,8 +79,9 @@ function hoursFromMs(lookbackMs: number): number {
   return lookbackMs / (60 * 60 * 1_000);
 }
 
-function isGitHubLookupFailure(error: unknown): boolean {
+function isGitHubFailure(error: unknown): boolean {
   return (
+    error instanceof GitHubAuthConfigError ||
     error instanceof GitHubAuthError ||
     error instanceof GitHubRateLimitError ||
     error instanceof GitHubApiError ||
@@ -90,8 +97,10 @@ function isGitHubLookupFailure(error: unknown): boolean {
  * pretending otherwise is how a health check would start making causal claims. The renderer says
  * so and tells the user to run again later.
  *
- * Commit lookup is skipped until there are two snapshots: there is no growth window to search, and
- * listing recent commits would look like an answer to a question that has not been asked yet.
+ * Commit lookup and GitHub auth are deferred until there are two snapshots: there is no growth
+ * window to search, and listing recent commits would look like an answer to a question that has
+ * not been asked yet. Exit code 6 (GitHub unavailable) therefore only applies when candidates
+ * were expected.
  *
  * When a repository was requested but GitHub cannot be reached, the Redis report is still produced
  * with a `github-unavailable` gap and empty candidates — never a hard failure that hides the Cause.
@@ -148,13 +157,15 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
   let resultGraph = graph;
 
   if (snapshots.length >= 2) {
-    const commitSource = request.commitSource;
-    if (commitSource === undefined) {
-      throw new Error(
-        'A GitHub commit source is required when a repository is connected and at least two snapshots exist.',
-      );
-    }
     try {
+      const commitSource =
+        request.commitSource ??
+        (request.createCommitSource === undefined ? undefined : await request.createCommitSource());
+      if (commitSource === undefined) {
+        throw new Error(
+          'A GitHub commit source is required when a repository is connected and at least two snapshots exist.',
+        );
+      }
       commitCandidates = await findCandidateCommits(commitSource, {
         repository,
         anomalyWindow: graph.window,
@@ -163,7 +174,7 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
         maxResults: maxCommitResults,
       });
     } catch (error) {
-      if (!isGitHubLookupFailure(error)) {
+      if (!isGitHubFailure(error)) {
         throw error;
       }
       const detail = error instanceof Error ? error.message : 'GitHub commit lookup failed.';

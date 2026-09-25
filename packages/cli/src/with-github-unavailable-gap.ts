@@ -18,7 +18,7 @@ export function withGitHubUnavailableGap(
     kind: 'github-unavailable',
     detail,
     remedy:
-      'Check the GitHub App is installed on that repository with contents:read and pull_requests:read, and that GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and a private key are set (see README). Then re-run with the same --snapshots directory and --repo.',
+      'Prefer a GitHub App (GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, private key) with contents:read and pull_requests:read on that repository. Solo fallback: `gh auth login`, or set GITHUB_TOKEN / GH_TOKEN. Then re-run with the same --snapshots directory and --repo (see README).',
   };
 
   return {

@@ -41,6 +41,11 @@ export { patternHintsFromGraph } from './pattern-hints-from-graph.js';
 export { withNoRepositoryGap } from './with-no-repository-gap.js';
 export { withGitHubUnavailableGap } from './with-github-unavailable-gap.js';
 export { shouldNudgeRepositoryConnection } from './should-nudge-repository-connection.js';
+export { createGitHubCommitSource, resolvePersonalGitHubToken } from './create-github-commit-source.js';
+export type {
+  CreateGitHubCommitSourceRequest,
+  ReadGhAuthToken,
+} from './create-github-commit-source.js';
 export { createAuthenticatedGitHubCommitSource } from './create-authenticated-github-commit-source.js';
 export type { CreateAuthenticatedGitHubCommitSourceRequest } from './create-authenticated-github-commit-source.js';
 

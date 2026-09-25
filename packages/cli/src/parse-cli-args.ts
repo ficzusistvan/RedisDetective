@@ -1,4 +1,7 @@
-import { GITHUB_APP_ENV_VARS } from '@redis-detective/github-integration';
+import {
+  GITHUB_APP_ENV_VARS,
+  GITHUB_PERSONAL_TOKEN_ENV_VARS,
+} from '@redis-detective/github-integration';
 
 import { commandFromArgv } from './command-from-argv.js';
 import type { CliCommand } from './command-from-argv.js';
@@ -24,7 +27,7 @@ export interface CliOptions {
   readonly snapshotDirectory: string | null;
   /**
    * `owner/repo` to search for candidate commits. `null` when the user did not pass `--repo` and
-   * no GitHub App + `GITHUB_REPOSITORY` fallback applied. Parsed later; this is the raw string.
+   * no Connected-repository env fallback applied. Parsed later; this is the raw string.
    */
   readonly repository: string | null;
   /** Hours before the growth window to search. `null` means the seven-day default. */
@@ -306,17 +309,26 @@ export function parseCliArgs(
 }
 
 /**
- * `GITHUB_REPOSITORY` is treated as a repo target only when a GitHub App is also configured.
- * GitHub Actions sets `GITHUB_REPOSITORY` on every job; using it alone would turn a Redis
- * diagnosis into a failed GitHub auth, which is not what the operator asked for.
+ * `GITHUB_REPOSITORY` is treated as a Connected repository only when some GitHub credential
+ * signal is also present (App id, or a personal token env var). GitHub Actions sets
+ * `GITHUB_REPOSITORY` on every job; using it alone would turn a Redis diagnosis into a failed
+ * GitHub auth. `gh auth token` is not checked here — parsing is sync.
  */
 function repositoryFallbackFromEnv(
   env: Readonly<Record<string, string | undefined>>,
 ): string | null {
-  const appId = env[GITHUB_APP_ENV_VARS.appId]?.trim();
   const fromEnv = env['GITHUB_REPOSITORY']?.trim();
-  if (appId === undefined || appId === '' || fromEnv === undefined || fromEnv === '') {
+  if (fromEnv === undefined || fromEnv === '') {
     return null;
   }
-  return fromEnv;
+
+  const appId = env[GITHUB_APP_ENV_VARS.appId]?.trim();
+  const githubToken = env[GITHUB_PERSONAL_TOKEN_ENV_VARS.githubToken]?.trim();
+  const ghToken = env[GITHUB_PERSONAL_TOKEN_ENV_VARS.ghToken]?.trim();
+  const hasCredentialSignal =
+    (appId !== undefined && appId !== '') ||
+    (githubToken !== undefined && githubToken !== '') ||
+    (ghToken !== undefined && ghToken !== '');
+
+  return hasCredentialSignal ? fromEnv : null;
 }

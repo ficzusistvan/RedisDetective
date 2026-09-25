@@ -20,6 +20,8 @@ import {
   loadGitHubAppCredentialsFromEnv,
   matchPatternHints,
   parseRepositoryRef,
+  isGitHubAppEnvComplete,
+  GITHUB_PERSONAL_TOKEN_ENV_VARS,
 } from '@redis-detective/github-integration';
 import type {
   GitHubCommitSource,
@@ -274,7 +276,7 @@ MIIBVA==
 `;
 
 describe('loadGitHubAppCredentialsFromEnv', () => {
-  it('documents the env vars it expects, and never a personal access token', () => {
+  it('documents the App env vars it expects; personal tokens are a separate CLI concern', () => {
     expect(Object.values(GITHUB_APP_ENV_VARS)).toEqual([
       'GITHUB_APP_ID',
       'GITHUB_APP_INSTALLATION_ID',
@@ -283,6 +285,26 @@ describe('loadGitHubAppCredentialsFromEnv', () => {
     ]);
     expect(Object.values(GITHUB_APP_ENV_VARS)).not.toContain('GITHUB_TOKEN');
     expect(Object.values(GITHUB_APP_ENV_VARS)).not.toContain('GH_TOKEN');
+    expect(Object.values(GITHUB_PERSONAL_TOKEN_ENV_VARS)).toEqual(['GITHUB_TOKEN', 'GH_TOKEN']);
+  });
+
+  it('reports when App env is complete enough to prefer App auth', () => {
+    expect(
+      isGitHubAppEnvComplete({
+        GITHUB_APP_ID: '1',
+        GITHUB_APP_INSTALLATION_ID: '2',
+        GITHUB_APP_PRIVATE_KEY_PATH: '/tmp/app.pem',
+      }),
+    ).toBe(true);
+    expect(isGitHubAppEnvComplete({ GITHUB_APP_ID: '1' })).toBe(false);
+    expect(
+      isGitHubAppEnvComplete({
+        GITHUB_APP_ID: '1',
+        GITHUB_APP_INSTALLATION_ID: '2',
+        GITHUB_APP_PRIVATE_KEY_PATH: '/tmp/app.pem',
+        GITHUB_APP_PRIVATE_KEY_BASE64: 'YQ==',
+      }),
+    ).toBe(false);
   });
 
   it('reads the key from base64 when that is the only source', () => {

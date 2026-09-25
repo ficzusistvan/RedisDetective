@@ -1,40 +1,36 @@
-import {
-  authenticateGitHubApp,
-  createGitHubHttp,
-  createGitHubRestCommitSource,
-  loadGitHubAppCredentialsFromEnv,
-} from '@redis-detective/github-integration';
 import type {
   GitHubCommitSource,
   GitHubFetch,
   GitHubRepositoryRef,
 } from '@redis-detective/github-integration';
 
+import {
+  createGitHubCommitSource,
+  defaultReadGhAuthToken,
+} from './create-github-commit-source.js';
+import type { ReadGhAuthToken } from './create-github-commit-source.js';
+
+export type { ReadGhAuthToken };
+
 export interface CreateAuthenticatedGitHubCommitSourceRequest {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly repository: GitHubRepositoryRef;
   readonly now: () => Date;
-  /**
-   * Required. Passing `fetch` in from the caller — rather than defaulting to `globalThis.fetch` —
-   * is what keeps a unit test from reaching the network by constructing this function.
-   */
   readonly fetchImpl: GitHubFetch;
+  readonly readGhAuthToken?: ReadGhAuthToken;
 }
 
 /**
- * Exchanges GitHub App credentials from the environment for a read-only commit source.
- *
- * The installation token lives only in the returned source's closure. It is never logged, never
- * returned, and never placed in an error.
+ * @deprecated Prefer `createGitHubCommitSource`. Kept as a thin alias for existing imports.
  */
 export async function createAuthenticatedGitHubCommitSource(
   request: CreateAuthenticatedGitHubCommitSourceRequest,
 ): Promise<GitHubCommitSource> {
-  const credentials = loadGitHubAppCredentialsFromEnv(request.env);
-  const http = createGitHubHttp(request.fetchImpl);
-  const installation = await authenticateGitHubApp(credentials, request.repository, {
-    http,
+  return createGitHubCommitSource({
+    env: request.env,
+    repository: request.repository,
     now: request.now,
+    fetchImpl: request.fetchImpl,
+    readGhAuthToken: request.readGhAuthToken ?? defaultReadGhAuthToken,
   });
-  return createGitHubRestCommitSource({ http, token: installation.token });
 }

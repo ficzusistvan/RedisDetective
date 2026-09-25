@@ -15,7 +15,8 @@ import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
 import { RedisConnectionError, createRedisClient } from './create-redis-client.js';
 import type { RedisConnection } from './create-redis-client.js';
-import { createAuthenticatedGitHubCommitSource } from './create-authenticated-github-commit-source.js';
+import { createGitHubCommitSource } from './create-github-commit-source.js';
+import type { ReadGhAuthToken } from './create-github-commit-source.js';
 import { createLlmClientFromEnv } from './create-llm-client-from-env.js';
 import { EXIT_CODES } from './exit-codes.js';
 import type { ExitCode } from './exit-codes.js';
@@ -52,7 +53,8 @@ export type OpenSnapshotStore = (directory: string) => SnapshotStore;
 
 /**
  * Builds the GitHub read surface for a repository. Overridden in tests with a fake so the command
- * never reaches the network. Production exchanges App credentials for an installation token.
+ * never reaches the network. Production authenticates via GitHub App (preferred) or personal
+ * token / `gh` fallback.
  */
 export type CreateCommitSource = (
   repository: GitHubRepositoryRef,
@@ -76,9 +78,14 @@ export interface MainContext {
   readonly openSnapshotStore?: OpenSnapshotStore;
   /**
    * Injected so diagnosis can be exercised without GitHub credentials or a live API. Production
-   * authenticates a GitHub App and talks to api.github.com.
+   * uses App credentials when complete, otherwise `gh` / `GITHUB_TOKEN` / `GH_TOKEN`.
    */
   readonly createCommitSource?: CreateCommitSource;
+  /**
+   * Injected so personal-token discovery never shells out to `gh` in tests. Production defaults
+   * to `gh auth token`.
+   */
+  readonly readGhAuthToken?: ReadGhAuthToken;
   /**
    * Injected so diagnosis can be exercised without a language-model provider. Production
    * constructs one from `LLM_API_KEY` when set.
@@ -310,12 +317,9 @@ async function runDiagnosisCommand(
     repository: repositoryResult.repository,
     lookbackMs:
       (options.lookbackHours ?? DEFAULT_COMMIT_LOOKBACK_HOURS) * 60 * 60 * 1_000,
-    ...(repositoryResult.commitSource === undefined
+    ...(repositoryResult.createCommitSource === undefined
       ? {}
-      : { commitSource: repositoryResult.commitSource }),
-    ...(repositoryResult.githubUnavailableDetail === undefined
-      ? {}
-      : { githubUnavailableDetail: repositoryResult.githubUnavailableDetail }),
+      : { createCommitSource: repositoryResult.createCommitSource }),
     ...(llmClient === null ? {} : { llmClient }),
   };
 
@@ -342,30 +346,15 @@ type ResolvedRepository =
   | {
       readonly ok: true;
       readonly repository: GitHubRepositoryRef | null;
-      readonly commitSource?: GitHubCommitSource;
-      readonly githubUnavailableDetail?: string;
+      /** Lazily builds the commit source; runDiagnosis calls this only when ≥2 snapshots exist. */
+      readonly createCommitSource?: () => Promise<GitHubCommitSource>;
     }
   | { readonly ok: false; readonly exitCode: ExitCode };
-
-function githubFailureDetail(error: unknown): string | null {
-  if (error instanceof GitHubAuthConfigError) {
-    return error.message;
-  }
-  if (
-    error instanceof GitHubAuthError ||
-    error instanceof GitHubRateLimitError ||
-    error instanceof GitHubApiError ||
-    error instanceof FindCandidateCommitsError
-  ) {
-    return error.message;
-  }
-  return null;
-}
 
 function writeGitHubFailureStderr(streams: MainStreams, error: unknown): void {
   if (error instanceof GitHubAuthConfigError) {
     streams.writeError(
-      `${error.message}\nCredentials are read from the environment, including a .env file in this directory or a parent. Copy .env.example to .env, or export the variables in your shell.\n`,
+      `${error.message}\nCredentials are read from the environment (including a .env file in this directory or a parent), or from \`gh auth token\`. See README for App setup and the solo fallback.\n`,
     );
     return;
   }
@@ -398,25 +387,31 @@ async function resolveRepository(
     throw error;
   }
 
-  try {
-    const create =
-      context.createCommitSource ??
-      ((repo: GitHubRepositoryRef) =>
-        createAuthenticatedGitHubCommitSource({
-          env: context.env,
-          repository: repo,
-          now: context.now,
-          fetchImpl: (url, init) => globalThis.fetch(url, init),
-        }));
-    return { ok: true, repository, commitSource: await create(repository) };
-  } catch (error) {
-    const detail = githubFailureDetail(error);
-    if (detail !== null) {
-      writeGitHubFailureStderr(context.streams, error);
-      return { ok: true, repository, githubUnavailableDetail: detail };
-    }
-    throw error;
-  }
+  const create =
+    context.createCommitSource ??
+    ((repo: GitHubRepositoryRef) =>
+      createGitHubCommitSource({
+        env: context.env,
+        repository: repo,
+        now: context.now,
+        fetchImpl: (url, init) => globalThis.fetch(url, init),
+        ...(context.readGhAuthToken === undefined
+          ? {}
+          : { readGhAuthToken: context.readGhAuthToken }),
+      }));
+
+  return {
+    ok: true,
+    repository,
+    createCommitSource: async () => {
+      try {
+        return await create(repository);
+      } catch (error) {
+        writeGitHubFailureStderr(context.streams, error);
+        throw error;
+      }
+    },
+  };
 }
 
 async function writeDiagnosis(
@@ -472,7 +467,7 @@ function reportCaughtError(streams: MainStreams, error: unknown): ExitCode {
   }
   if (error instanceof GitHubAuthConfigError) {
     streams.writeError(
-      `${error.message}\nCredentials are read from the environment, including a .env file in this directory or a parent. Copy .env.example to .env, or export the variables in your shell.\n`,
+      `${error.message}\nCredentials are read from the environment (including a .env file in this directory or a parent), or from \`gh auth token\`. See README for App setup and the solo fallback.\n`,
     );
     return EXIT_CODES.usageError;
   }

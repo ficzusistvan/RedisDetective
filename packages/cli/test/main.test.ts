@@ -53,6 +53,7 @@ async function run(
     readonly connect?: ConnectToRedis;
     readonly openSnapshotStore?: OpenSnapshotStore;
     readonly createCommitSource?: CreateCommitSource;
+    readonly readGhAuthToken?: () => Promise<string | null>;
     readonly stopSignal?: AbortSignal;
     readonly watchDeps?: WatchDeps;
   } = {},
@@ -75,6 +76,8 @@ async function run(
     connect:
       options.connect ??
       (() => Promise.resolve({ client: leakyInstance(), close: () => Promise.resolve() })),
+    // Never shell out to `gh` in this suite.
+    readGhAuthToken: options.readGhAuthToken ?? (() => Promise.resolve(null)),
     ...(options.openSnapshotStore === undefined
       ? {}
       : { openSnapshotStore: options.openSnapshotStore }),
@@ -136,12 +139,13 @@ describe('main', () => {
       );
     });
 
-    it('documents --repo as GitHub App auth, not a personal token', async () => {
+    it('documents --repo with App preferred and solo gh/token fallback', async () => {
       const help = (await run(['--help'])).out;
       expect(help).toContain('--repo');
       expect(help).toContain('GitHub App');
-      expect(help).toContain('never');
-      expect(help).toContain('personal access token');
+      expect(help).toContain('Solo fallback');
+      expect(help).toContain('gh auth');
+      expect(help).toContain('GITHUB_TOKEN');
       expect(help).toContain('.env');
       expect(help).toContain('LLM_API_KEY');
     });
@@ -327,16 +331,32 @@ describe('main', () => {
       expect(result.out).not.toContain('No repository connected');
     });
 
-    it('prints the Redis diagnosis when GitHub App credentials are missing after --repo', async () => {
+    it('prints the Redis diagnosis when GitHub credentials are missing after --repo', async () => {
       const result = await run(['--snapshots', './snaps', '--repo', 'acme/checkout'], {
         openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
       });
 
       expect(result.exitCode).toBe(EXIT_CODES.githubError);
-      expect(result.err).toContain('GITHUB_APP_ID');
-      expect(result.err).toContain('.env');
+      expect(result.err).toContain('No GitHub credentials');
+      expect(result.err).toContain('gh auth');
       expect(result.out).toContain('cart:items:*');
       expect(result.out).toContain('GitHub unavailable');
+    });
+
+    it('does not authenticate to GitHub when --repo is set but only one snapshot exists', async () => {
+      let created = false;
+      const result = await run(['--snapshots', './snaps', '--repo', 'acme/checkout'], {
+        openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots().slice(0, 1)),
+        createCommitSource: () => {
+          created = true;
+          return Promise.resolve(fakeGitHubCommitSource());
+        },
+      });
+
+      expect(created).toBe(false);
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.out).toContain('Candidate commits');
+      expect(result.out).not.toContain('GitHub unavailable');
     });
 
     it('prints the Redis diagnosis when GitHub fails after --repo, then exits non-zero', async () => {

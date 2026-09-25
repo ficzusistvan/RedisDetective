@@ -81,8 +81,8 @@ retention policy, and nothing leaves the machine.
 ## Optional: candidate commits (recommended second step)
 
 Redis diagnosis stands alone. When the report names a **Cause** with strong or moderate evidence,
-connect a GitHub repo as a second pass so you can inspect **candidate commits** in that window —
-never as Causes.
+point a **Connected repository** at a second pass so you can inspect **candidate commits** in that
+window — never as Causes.
 
 ### Two-pass workflow
 
@@ -92,7 +92,7 @@ never as Causes.
    redis-detective --url redis://localhost:6379 --snapshots ./snaps
    ```
 
-2. **Pass 2 — same snapshots + repo** (after the App is set up): reuse the **same**
+2. **Pass 2 — same snapshots + repo** (auth can happen here the first time): reuse the **same**
    `--snapshots` directory so candidates match the growth window you already diagnosed. Prefer no
    live `--url` on this pass.
 
@@ -107,12 +107,11 @@ never as Causes.
    Optional: `--lookback-hours` (default **168**, i.e. 7 days before the growth window). Widen it
    when deploys are rarer; it is how far to scan, not a confidence dial.
 
-### One-time GitHub App setup (BYO)
+### Auth (App preferred, solo fallback)
 
-Authentication is a **GitHub App**, never a personal access token. Prefer an **org-owned** App
-(Settings → Developer settings under the org); a user-owned App is fine for solo projects.
+**Preferred:** a **GitHub App** (org-owned when you can). Least privilege, revocable, auditable.
 
-1. Create a GitHub App (org preferred).
+1. Create a GitHub App (org preferred; user-owned is fine for solo projects).
 2. Set permissions: **Contents: Read**, **Pull requests: Read**.
 3. **No webhooks and no callback URL** — this CLI only exchanges an installation token.
 4. Install the App on **selected repositories** that own Redis write paths.
@@ -123,7 +122,14 @@ Authentication is a **GitHub App**, never a personal access token. Prefer an **o
    - `GITHUB_APP_INSTALLATION_ID`
    - exactly one of `GITHUB_APP_PRIVATE_KEY_PATH` or `GITHUB_APP_PRIVATE_KEY_BASE64`
 
-See `.env.example`. The CLI loads `.env` automatically; shell-set variables win.
+**Solo fallback** (when App env is incomplete): run `gh auth login` (the CLI calls
+`gh auth token`), or set `GITHUB_TOKEN` / `GH_TOKEN`. Documented minimum access is read contents
+and pull requests on the Connected repository — we do not inspect token scopes. If App env is
+**complete**, the App is used and personal tokens are ignored.
+
+See `.env.example`. The CLI loads `.env` automatically; shell-set variables win. GitHub auth runs
+only once there are **two or more** snapshots; with a single snapshot, `--repo` is recorded but
+no token exchange happens.
 
 ### Reading the candidate list
 
@@ -133,14 +139,16 @@ it (Commit lookback) — timing groups for scanning, not a plausibility ranking.
 commits/PRs and search those diffs for the attributed key pattern or TTL-related writes — still
 not proof.
 
-If you passed `--repo` and GitHub auth or the API fails, the Redis diagnosis still prints; the
-report records **GitHub unavailable**, candidates stay empty, and the process exits non-zero.
+If you passed `--repo`, have two or more snapshots, and GitHub auth or the API fails, the Redis
+diagnosis still prints; the report records **GitHub unavailable**, candidates stay empty, and the
+process exits **6**.
 
 ### CI footnote
 
-In GitHub Actions, when a GitHub App is configured, `GITHUB_REPOSITORY` can supply the repo target
-during a `--snapshots` diagnosis if you omit `--repo`. Alone (without App env), it does not turn
-on GitHub lookup.
+In GitHub Actions, `GITHUB_REPOSITORY` can supply the Connected repository during a `--snapshots`
+diagnosis if you omit `--repo` **and** a credential signal is present (`GITHUB_APP_ID` and/or
+`GITHUB_TOKEN` / `GH_TOKEN`). Alone it does not turn on GitHub lookup. Default
+`GITHUB_TOKEN` often needs `contents: read` (and pull-requests read) on the job.
 
 ## Safety
 

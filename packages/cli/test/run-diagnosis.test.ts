@@ -185,24 +185,22 @@ describe('runDiagnosis', () => {
     expect(report.commitCandidates[0]?.pullRequest?.number).toBe(9);
   });
 
-  it('does not query GitHub until there are two snapshots', async () => {
-    let listed = false;
-    const source = {
-      listCommits: () => {
-        listed = true;
-        return Promise.resolve([]);
-      },
-      listPullRequestsForCommit: () => Promise.resolve([]),
-    };
-
+  it('does not call createCommitSource until there are two snapshots', async () => {
+    let created = false;
     const report = await runDiagnosis(
       request(createMemorySnapshotStore([snapshotFixture()]), {
         repository: { owner: 'acme', repo: 'checkout' },
-        commitSource: source,
+        createCommitSource: () => {
+          created = true;
+          return Promise.resolve({
+            listCommits: () => Promise.resolve([]),
+            listPullRequestsForCommit: () => Promise.resolve([]),
+          });
+        },
       }),
     );
 
-    expect(listed).toBe(false);
+    expect(created).toBe(false);
     expect(report.repository).toBe('acme/checkout');
     expect(report.commitCandidates).toEqual([]);
     expect(report.graph.gaps.map((gap) => gap.kind)).toContain('insufficient-snapshots');

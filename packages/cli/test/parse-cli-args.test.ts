@@ -116,11 +116,17 @@ describe('parseCliArgs', () => {
     expect(() => parseCliArgs(['--lookback-hours', '-1'])).toThrow(CliUsageError);
   });
 
-  it('falls back to GITHUB_REPOSITORY only during diagnosis when a GitHub App is also configured', () => {
+  it('falls back to GITHUB_REPOSITORY during diagnosis when a credential signal is present', () => {
     expect(
       parseCliArgs(['--snapshots', './snaps'], {
         GITHUB_REPOSITORY: 'acme/from-env',
         GITHUB_APP_ID: '42',
+      }).repository,
+    ).toBe('acme/from-env');
+    expect(
+      parseCliArgs(['--snapshots', './snaps'], {
+        GITHUB_REPOSITORY: 'acme/from-env',
+        GITHUB_TOKEN: 'ghs_example',
       }).repository,
     ).toBe('acme/from-env');
     expect(

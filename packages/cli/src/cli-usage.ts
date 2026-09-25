@@ -12,7 +12,8 @@ export const HELP_TEXT = `${CLI_NAME} — Redis Memory Health Check
 
 Read-only. No signup required. Samples your instance and reports what is using memory.
 Pass --snapshots to save each sample and, on later runs, name the pattern responsible
-for growth. Pass --repo to list commits in that window (GitHub App; optional).
+for growth. Pass --repo to list commits in that window (GitHub App preferred; gh/token
+fallback; optional).
 If LLM_API_KEY is set, the diagnosis paragraph is worded by a model from the evidence
 only; otherwise a template is used. No API key is required.
 
@@ -62,13 +63,15 @@ Options
                           window (recommended second step after a Redis Cause). Requires
                           --snapshots; reuse the same snapshot directory as the Redis-only pass.
                           Prefer the repo that writes the attributed key pattern. Defaults to
-                          $GITHUB_REPOSITORY when a GitHub App is also configured (CI footnote).
-                          Authentication is a GitHub App (GITHUB_APP_ID,
-                          GITHUB_APP_INSTALLATION_ID, and a private key), never a personal access token.
-                          Those variables are read from the environment, including a .env file in
-                          this directory or a parent. Install with Contents: Read and Pull requests:
-                          Read; no webhooks needed. Commits listed are candidates, not causes. If
-                          GitHub fails, the Redis diagnosis still prints.
+                          $GITHUB_REPOSITORY when a GitHub credential signal is also present
+                          (GITHUB_APP_ID and/or GITHUB_TOKEN / GH_TOKEN; CI footnote).
+                          Preferred auth is a GitHub App (GITHUB_APP_ID,
+                          GITHUB_APP_INSTALLATION_ID, and a private key). Solo fallback: gh auth
+                          token, or GITHUB_TOKEN / GH_TOKEN. Credentials come from the environment
+                          (including a .env file) or from gh. Install an App with Contents: Read
+                          and Pull requests: Read; no webhooks needed. Commits listed are
+                          candidates, not causes. If GitHub fails after two or more snapshots, the
+                          Redis diagnosis still prints (exit 6).
       --lookback-hours <n>
                           Hours before the growth window to include in the commit search
                           (default ${String(DEFAULT_COMMIT_LOOKBACK_HOURS)}, i.e. ${String(DEFAULT_COMMIT_LOOKBACK_HOURS / 24)} days). Widen when deploys are rarer. Requires --repo.

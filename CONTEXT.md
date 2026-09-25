@@ -24,6 +24,10 @@ _Avoid_: anomaly window, grace period, after-anomaly window
 A textual coincidence between a Key pattern and a commit message or changed path. Used only to make matching Commit candidates easier to notice; never proof of causation and never Redis evidence.
 _Avoid_: evidence, attribution, related commit (when implying ownership of the Cause)
 
+**Connected repository**:
+The GitHub `owner/repo` the operator pointed a diagnosis at for Commit candidate lookup. Naming a Connected repository is separate from whether GitHub authentication succeeded.
+_Avoid_: Cause, repository connection (when meaning auth), linked repo (ambiguous with PR links)
+
 **Key pattern**:
 A grouped key-space prefix or shape inferred from the sample (for example `session:*`), used as the unit of growth attribution.
 _Avoid_: Key, glob (when meaning the attributed group)

@@ -61,14 +61,16 @@ either.
    through `buildEvidenceGraph`. Offline diagnosis from stored files, no Redis connection, is
    supported. **Done.** The `watch` command runs that same path on an interval, so the series a
    diagnosis needs can accumulate without the user re-running the command by hand.
-6. **`github-integration`** — GitHub App auth and candidate commit lookup in the anomaly window
-   or the Commit lookback before it. **Done:** App credentials from the environment,
-   installation-token exchange, REST commit listing against an injected HTTP client, and candidate
-   classification (temporal relation + Pattern hints). `--repo owner/repo` on a diagnosis lists
-   candidates without ranking them as causes. When a named Cause has strong or moderate evidence
-   and no repo is connected, the report records a `no-repository-connected` gap. If `--repo` is
-   set but GitHub fails, the Redis diagnosis still prints with a `github-unavailable` gap
-   (non-zero exit).
+6. **`github-integration`** — GitHub App auth (preferred) and candidate commit lookup in the
+   anomaly window or the Commit lookback before it; CLI may fall back to `gh` /
+   `GITHUB_TOKEN` / `GH_TOKEN` when App env is incomplete (ADR 0002). **Done:** App credentials
+   from the environment, installation-token exchange, REST commit listing against an injected
+   HTTP client, and candidate classification (temporal relation + Pattern hints).
+   `--repo owner/repo` on a diagnosis lists candidates without ranking them as causes. When a
+   named Cause has strong or moderate evidence and no repo is connected, the report records a
+   `no-repository-connected` gap. If `--repo` is set, there are two or more snapshots, and
+   GitHub fails, the Redis diagnosis still prints with a `github-unavailable` gap (non-zero
+   exit).
 7. **`reasoner`** — turn an `EvidenceGraph` into prose. **Done:** a deterministic template
    explanation is always produced (`model: null`). If `LLM_API_KEY` is set, an OpenAI-compatible
    client may reword it; `validateExplanationAgainstEvidence` rejects invented patterns, commits,

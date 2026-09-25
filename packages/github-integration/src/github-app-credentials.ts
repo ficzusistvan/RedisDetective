@@ -1,15 +1,12 @@
 import { readFileSync } from 'node:fs';
 
 /**
- * GitHub **App** credentials. Deliberately not a personal access token and not a raw OAuth token.
+ * GitHub **App** credentials for the preferred org auth path.
  *
  * A GitHub App installation gives per-repository, least-privilege, revocable access with a
- * short-lived installation token, and it is auditable by the org that installed it. Asking a user
- * to paste a long-lived PAT with `repo` scope into our config would hand us far more access than
- * reading recent commits requires — and we would then be storing it.
- *
- * The private key never appears in code or in a committed file: it is read from the environment or
- * from a path outside the repo at call time. `*.pem` is gitignored for the same reason.
+ * short-lived installation token, and it is auditable by the org that installed it. When App
+ * environment is incomplete, the CLI may fall back to a personal token or `gh auth token` — see
+ * ADR 0002. The private key never appears in code or in a committed file.
  */
 export interface GitHubAppCredentials {
   readonly appId: string;
@@ -23,6 +20,12 @@ export const GITHUB_APP_ENV_VARS = {
   installationId: 'GITHUB_APP_INSTALLATION_ID',
   privateKeyPath: 'GITHUB_APP_PRIVATE_KEY_PATH',
   privateKeyBase64: 'GITHUB_APP_PRIVATE_KEY_BASE64',
+} as const;
+
+/** Personal-token env names consulted only when App env is incomplete (CLI discovery order). */
+export const GITHUB_PERSONAL_TOKEN_ENV_VARS = {
+  githubToken: 'GITHUB_TOKEN',
+  ghToken: 'GH_TOKEN',
 } as const;
 
 export class GitHubAuthConfigError extends Error {
@@ -44,6 +47,24 @@ function readEnv(env: Readonly<Record<string, string | undefined>>, name: string
   }
   const trimmed = value.trim();
   return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * True when App id, installation id, and exactly one private-key source are set.
+ * Does not read or validate the PEM — that happens in `loadGitHubAppCredentialsFromEnv`.
+ */
+export function isGitHubAppEnvComplete(
+  env: Readonly<Record<string, string | undefined>>,
+): boolean {
+  if (readEnv(env, GITHUB_APP_ENV_VARS.appId) === null) {
+    return false;
+  }
+  if (readEnv(env, GITHUB_APP_ENV_VARS.installationId) === null) {
+    return false;
+  }
+  const path = readEnv(env, GITHUB_APP_ENV_VARS.privateKeyPath);
+  const base64 = readEnv(env, GITHUB_APP_ENV_VARS.privateKeyBase64);
+  return (path !== null) !== (base64 !== null);
 }
 
 function readPrivateKey(

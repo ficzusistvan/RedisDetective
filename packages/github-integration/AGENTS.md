@@ -2,10 +2,15 @@
 
 ## The rule
 
-Authentication is a **GitHub App installation**, never a personal access token and never a raw
-OAuth token pasted into config. The private key is read from the environment at call time and
-never committed (`*.pem` is gitignored). Installation tokens live in memory, expire in about an
-hour, and must not be logged, persisted, or interpolated into error messages.
+**Preferred auth** is a **GitHub App installation**. When App environment is complete, use it —
+never a personal access token for that path. The private key is read from the environment at call
+time and never committed (`*.pem` is gitignored). Installation tokens live in memory, expire in
+about an hour, and must not be logged, persisted, or interpolated into error messages.
+
+When App environment is **incomplete**, the **CLI** (not this package’s business logic) may supply
+a bearer token from `gh auth token` / `GITHUB_TOKEN` / `GH_TOKEN` into
+`createGitHubRestCommitSource`. That dual-auth policy is ADR 0002. This package still must not
+call `gh` or invent a second HTTP stack for PATs — same REST source, different token.
 
 `GitHubCommitSource` is the read surface. `findCandidateCommits` takes one as an argument. Tests
 inject a fake; production (`packages/cli`) injects `createGitHubRestCommitSource`. This package
@@ -18,9 +23,11 @@ evidence.
 
 ## Why
 
-A PAT with `repo` scope is far more access than "list commits in a window" needs, and it would
-then sit in a config file. An App installation is per-repository, least-privilege
+A long-lived PAT with broad `repo` scope is more access than "list commits in a window" needs, and
+it would then sit in a config file. An App installation is per-repository, least-privilege
 (`contents: read`, `pull_requests: read`), revocable, and auditable by the org that installed it.
+Solo operators still need a path that does not require creating an App mid-incident; that path is
+deliberately a CLI concern so this package stays a narrow GitHub HTTP + candidate classifier.
 
 Keeping HTTP behind `GitHubHttp` / `GitHubCommitSource` is what makes `pnpm test` possible with
 no network: the interesting logic (window widening, pattern matching, temporal classification,

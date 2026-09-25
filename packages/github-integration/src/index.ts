@@ -7,7 +7,9 @@ export type { GitHubRepositoryRef } from './github-repository-ref.js';
 
 export {
   GITHUB_APP_ENV_VARS,
+  GITHUB_PERSONAL_TOKEN_ENV_VARS,
   GitHubAuthConfigError,
+  isGitHubAppEnvComplete,
   loadGitHubAppCredentialsFromEnv,
 } from './github-app-credentials.js';
 export type {

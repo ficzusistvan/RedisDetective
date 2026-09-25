@@ -1,0 +1,3 @@
+# Commits are never Causes
+
+Redis Detective names a **Cause** only from Redis evidence (a key pattern and what changed about it). Git output is **Commit candidates** in or near the anomaly window—optional context for a human, never ranked or worded as the Cause. Pattern-prefix matches are hints, not proof; after-anomaly commits stay listed and labelled so they can be ruled out. We walked this back from “name the commit that most plausibly introduced the change” because we have no validated commit-attribution signal, and claiming one would repeat the numeric-confidence trap. Rejected alternatives: keep aspirational “most plausible commit” marketing while shipping honest candidates, or build evidence rules that promote one candidate to a Cause.

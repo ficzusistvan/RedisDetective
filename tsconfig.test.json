@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "baseUrl": ".",
+    "paths": {
+      "@redis-detective/core-types": ["./packages/core-types/src/index.ts"],
+      "@redis-detective/sampler": ["./packages/sampler/src/index.ts"],
+      "@redis-detective/sampler/testing": ["./packages/sampler/src/testing/index.ts"],
+      "@redis-detective/evidence": ["./packages/evidence/src/index.ts"],
+      "@redis-detective/github-integration": ["./packages/github-integration/src/index.ts"],
+      "@redis-detective/reasoner": ["./packages/reasoner/src/index.ts"],
+      "@redis-detective/cli": ["./packages/cli/src/index.ts"]
+    }
+  },
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "vitest.shared.ts"]
+}

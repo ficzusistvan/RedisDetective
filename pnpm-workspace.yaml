@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+
+# Vitest needs esbuild's postinstall to place its native binary. pnpm 10 blocks build
+# scripts by default, so it is allowed explicitly rather than globally.
+onlyBuiltDependencies:
+  - esbuild

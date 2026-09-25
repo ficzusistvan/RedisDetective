@@ -1,0 +1,34 @@
+{
+  "name": "@redis-detective/monorepo",
+  "version": "0.3.0",
+  "license": "FSL-1.1-Apache-2.0",
+  "private": true,
+  "description": "Diagnoses why a Redis instance's memory grew, attributing the cause to a key pattern and the commit that introduced it.",
+  "type": "module",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "test": "pnpm -r test",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run pack:cli",
+    "pack:cli": "node scripts/stage-cli-publish.mjs",
+    "health-check": "pnpm --filter @redis-detective/cli run start"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.26.0",
+    "@types/node": "^22.15.3",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.26.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.32.0",
+    "vitest": "^3.1.3"
+  }
+}

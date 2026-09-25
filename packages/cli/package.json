@@ -1,0 +1,37 @@
+{
+  "name": "@redis-detective/cli",
+  "version": "0.3.0",
+  "license": "FSL-1.1-Apache-2.0",
+  "private": true,
+  "description": "Redis Memory Health Check — read-only, no signup, stdout report.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "redis-detective": "./dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src test",
+    "start": "node dist/bin.js",
+    "prepublishOnly": "node -e \"throw new Error('Do not publish @redis-detective/cli. Run pnpm pack:cli and publish packages/cli/publish as redis-detective.')\""
+  },
+  "dependencies": {
+    "@redis-detective/core-types": "workspace:*",
+    "@redis-detective/evidence": "workspace:*",
+    "@redis-detective/github-integration": "workspace:*",
+    "@redis-detective/reasoner": "workspace:*",
+    "@redis-detective/sampler": "workspace:*",
+    "redis": "^6.2.1"
+  }
+}

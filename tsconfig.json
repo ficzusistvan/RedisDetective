@@ -1,0 +1,11 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core-types" },
+    { "path": "./packages/sampler" },
+    { "path": "./packages/evidence" },
+    { "path": "./packages/github-integration" },
+    { "path": "./packages/reasoner" },
+    { "path": "./packages/cli" }
+  ]
+}

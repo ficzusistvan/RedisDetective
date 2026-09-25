@@ -1,0 +1,26 @@
+{
+  "name": "@redis-detective/reasoner",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The only package permitted to call an LLM, and only to explain evidence it was handed.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src test"
+  },
+  "dependencies": {
+    "@redis-detective/core-types": "workspace:*"
+  }
+}

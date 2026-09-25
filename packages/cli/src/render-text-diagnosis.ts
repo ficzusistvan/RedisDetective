@@ -20,7 +20,6 @@ import {
 const TEMPORAL_LABEL: Record<TemporalRelation, string> = {
   'before-anomaly': 'before the growth',
   'within-anomaly-window': 'during the growth',
-  'after-anomaly': 'after the growth - too late to fall in the growth window',
 };
 
 function heading(text: string): string {
@@ -171,8 +170,8 @@ function renderCommitCandidates(report: DiagnosisReport): string | null {
     report.lookbackHours === null ? null : formatLookback(report.lookbackHours);
   const intro = [
     heading('Candidate commits'),
-    'These are commits in the window that might relate to the growth. A matching key prefix is a hint, not proof.',
-    'Read during the growth first, then before; commits after the growth are for ruling out. Open the linked commits/PRs and search those diffs for the attributed key pattern or TTL-related writes — still not proof.',
+    'These are commits in the growth window or the lookback before it. A matching key prefix is a Pattern hint, not proof.',
+    'Listed during the growth first, then before it — timing groups for scanning, not a plausibility ranking. Open the linked commits/PRs and search those diffs for the attributed key pattern or TTL-related writes — still not proof.',
     lookback === null
       ? `Repository  ${report.repository}`
       : `Repository  ${report.repository}  (${lookback})`,
@@ -200,9 +199,9 @@ function renderExplanation(report: DiagnosisReport): string {
       `Named cause  ${cause.pattern}  ${strengthTag(explanation.evidenceStrength)}`,
       `   ${cause.description}`,
     );
-    if (cause.relatedCommitShas.length > 0) {
+    if (explanation.hintedCandidateShas.length > 0) {
       lines.push(
-        `   Related commits (candidates, not proof): ${cause.relatedCommitShas
+        `   Hinted candidates (not proof): ${explanation.hintedCandidateShas
           .map((sha) => sha.slice(0, 7))
           .join(', ')}`,
       );

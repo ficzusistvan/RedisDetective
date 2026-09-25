@@ -96,17 +96,13 @@ function hintedCommits(
   candidates: readonly GitCommitCandidate[],
 ): readonly GitCommitCandidate[] {
   const hint = pattern.endsWith('*') ? pattern.slice(0, -1) : pattern;
-  return candidates.filter((candidate) => {
-    if (candidate.temporalRelation === 'after-anomaly') {
-      return false;
-    }
-    return (
+  return candidates.filter(
+    (candidate) =>
       hint !== '' &&
       candidate.matchedPatternHints.some(
         (matched) => matched === hint || matched === pattern || pattern.startsWith(matched),
-      )
-    );
-  });
+      ),
+  );
 }
 
 function unique(values: readonly string[]): readonly string[] {
@@ -164,6 +160,7 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
       headline,
       summary,
       likelyCause: null,
+      hintedCandidateShas: [],
       supportingEvidence: citations,
       recommendedActions: unique(actions),
       evidenceStrength: 'unclear',
@@ -200,18 +197,15 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
       statement: `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
     });
   }
-  for (const commit of commits) {
-    causeCitations.push({
-      evidenceId: commit.sha,
-      kind: 'commit',
-      statement: `${commit.shortSha} (${commit.temporalRelation}) mentions ${commit.matchedPatternHints.join(', ') || attribution.pattern}; that is a hint, not proof.`,
-    });
-  }
+  const commitCitations: ExplanationCitation[] = commits.map((commit) => ({
+    evidenceId: commit.sha,
+    kind: 'commit' as const,
+    statement: `${commit.shortSha} (${commit.temporalRelation}) mentions ${commit.matchedPatternHints.join(', ') || attribution.pattern}; that is a hint, not proof.`,
+  }));
 
   const likelyCause: ExplanationCause = {
     pattern: attribution.pattern,
     description: causeDescription(attribution, driftEvents, commits),
-    relatedCommitShas: commits.map((commit) => commit.sha),
     citations: causeCitations,
   };
 
@@ -240,7 +234,8 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
     headline: causeHeadline(attribution, driftEvents),
     summary: causeSummary(graph, attribution, anomaly?.deltaBytes ?? attribution.bytesGrowth, commits),
     likelyCause,
-    supportingEvidence: causeCitations,
+    hintedCandidateShas: commits.map((commit) => commit.sha),
+    supportingEvidence: [...causeCitations, ...commitCitations],
     recommendedActions: unique(actions),
     evidenceStrength: weakestStrength(strengths),
     unknowns,

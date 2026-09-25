@@ -57,7 +57,7 @@ describe('summarizeEvidenceDeterministically', () => {
     expect(explanation.likelyCause?.pattern).toBe('cart:items:*');
     expect(explanation.headline).toContain('cart:items:*');
     expect(explanation.headline).toContain('expir');
-    expect(explanation.likelyCause?.relatedCommitShas).toEqual([
+    expect(explanation.hintedCandidateShas).toEqual([
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     ]);
     expect(explanation.evidenceStrength).toBe('strong');
@@ -67,21 +67,20 @@ describe('summarizeEvidenceDeterministically', () => {
     ).toBe(true);
   });
 
-  it('does not attach after-anomaly SHAs as related commit candidates', () => {
+  it('does not put unhinted commits into hintedCandidateShas', () => {
     const explanation = summarizeEvidenceDeterministically(
       leakingReasonerInput({
         commitCandidates: [
           leakingCommit({
             sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
             shortSha: 'bbbbbbb',
-            temporalRelation: 'after-anomaly',
-            matchedPatternHints: ['cart:items:'],
+            matchedPatternHints: [],
           }),
         ],
       }),
     );
 
-    expect(explanation.likelyCause?.relatedCommitShas).toEqual([]);
+    expect(explanation.hintedCandidateShas).toEqual([]);
   });
 
   it('says so when there are not enough snapshots, instead of inventing a cause', () => {
@@ -166,17 +165,13 @@ describe('validateExplanationAgainstEvidence', () => {
     expect(result.violations.map((violation) => violation.kind)).toContain('unsupported-pattern');
   });
 
-  it('rejects a commit that is not a supplied pre-growth candidate', () => {
+  it('rejects a commit that is not a supplied candidate', () => {
     const input = leakingReasonerInput();
     const explanation = summarizeEvidenceDeterministically(input);
-    const cause = explanation.likelyCause;
-    if (cause === null) {
-      throw new Error('expected a cause');
-    }
     const result = validateExplanationAgainstEvidence(
       {
         ...explanation,
-        likelyCause: { ...cause, relatedCommitShas: ['deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'] },
+        hintedCandidateShas: ['deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'],
       },
       input,
     );
@@ -272,7 +267,6 @@ describe('explainEvidence', () => {
         likelyCause: {
           pattern: 'session:*',
           description: 'I decided it was sessions.',
-          relatedCommitShas: [],
           citations: [
             {
               evidenceId: 'attribution-cart-items',
@@ -281,6 +275,7 @@ describe('explainEvidence', () => {
             },
           ],
         },
+        hintedCandidateShas: [],
       }),
     );
 

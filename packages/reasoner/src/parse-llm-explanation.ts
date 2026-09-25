@@ -67,18 +67,11 @@ function readCause(value: unknown): ExplanationCause | null | undefined {
   }
   const pattern = readString(value['pattern']);
   const description = readString(value['description']);
-  const relatedCommitShas =
-    readStringArray(value['relatedCommitShas']) ?? readStringArray(value['suspectedCommitShas']);
   const citations = readCitations(value['citations']);
-  if (
-    pattern === null ||
-    description === null ||
-    relatedCommitShas === null ||
-    citations === null
-  ) {
+  if (pattern === null || description === null || citations === null) {
     return undefined;
   }
-  return { pattern, description, relatedCommitShas, citations };
+  return { pattern, description, citations };
 }
 
 function extractJsonObject(text: string): unknown {
@@ -123,6 +116,7 @@ export function parseLlmExplanation(
   const supportingEvidence = readCitations(parsed['supportingEvidence']);
   const evidenceStrength = parsed['evidenceStrength'];
   const likelyCause = readCause(parsed['likelyCause']);
+  const hintedCandidateShas = readStringArray(parsed['hintedCandidateShas']);
 
   if (
     headline === null ||
@@ -131,7 +125,8 @@ export function parseLlmExplanation(
     unknowns === null ||
     supportingEvidence === null ||
     !isEvidenceStrength(evidenceStrength) ||
-    likelyCause === undefined
+    likelyCause === undefined ||
+    hintedCandidateShas === null
   ) {
     return null;
   }
@@ -143,6 +138,7 @@ export function parseLlmExplanation(
     headline,
     summary,
     likelyCause,
+    hintedCandidateShas,
     supportingEvidence,
     recommendedActions,
     evidenceStrength,

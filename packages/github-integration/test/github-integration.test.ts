@@ -80,7 +80,7 @@ describe('parseRepositoryRef', () => {
 });
 
 describe('classifyTemporalRelation', () => {
-  it('places a commit before, inside, or after the window', () => {
+  it('places a commit before or inside the window, and drops commits after it', () => {
     expect(classifyTemporalRelation('2026-08-25T09:00:00.000Z', WINDOW)).toBe('before-anomaly');
     expect(classifyTemporalRelation('2026-08-25T10:00:00.000Z', WINDOW)).toBe(
       'within-anomaly-window',
@@ -88,7 +88,7 @@ describe('classifyTemporalRelation', () => {
     expect(classifyTemporalRelation('2026-08-25T12:00:00.000Z', WINDOW)).toBe(
       'within-anomaly-window',
     );
-    expect(classifyTemporalRelation('2026-08-25T13:00:00.000Z', WINDOW)).toBe('after-anomaly');
+    expect(classifyTemporalRelation('2026-08-25T13:00:00.000Z', WINDOW)).toBeNull();
   });
 
   it('refuses to guess at an unparseable timestamp', () => {
@@ -140,7 +140,7 @@ describe('findCandidateCommits', () => {
     expect(Date.parse(WINDOW.from) - Date.parse(seenFrom)).toBe(request.lookbackMs);
   });
 
-  it('classifies, matches hints, and keeps after-anomaly commits so they can be ruled out', async () => {
+  it('classifies, matches hints, and drops commits after the anomaly window', async () => {
     const candidates = await findCandidateCommits(
       sourceWith([
         rawCommit({
@@ -157,12 +157,33 @@ describe('findCandidateCommits', () => {
       request,
     );
 
+    expect(candidates.map((candidate) => candidate.temporalRelation)).toEqual(['before-anomaly']);
+    expect(candidates[0]?.matchedPatternHints).toEqual(['session:']);
+    expect(candidates[0]?.shortSha).toBe('aaaaaaa');
+  });
+
+  it('lists within-window commits before before-anomaly commits for scanning', async () => {
+    const candidates = await findCandidateCommits(
+      sourceWith([
+        rawCommit({
+          sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          committedAt: '2026-08-25T09:00:00.000Z',
+          message: 'earlier lookback',
+        }),
+        rawCommit({
+          sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          committedAt: '2026-08-25T11:00:00.000Z',
+          message: 'during growth',
+        }),
+      ]),
+      request,
+    );
+
     expect(candidates.map((candidate) => candidate.temporalRelation)).toEqual([
-      'after-anomaly',
+      'within-anomaly-window',
       'before-anomaly',
     ]);
-    expect(candidates[1]?.matchedPatternHints).toEqual(['session:']);
-    expect(candidates[1]?.shortSha).toBe('aaaaaaa');
+    expect(candidates.map((candidate) => candidate.shortSha)).toEqual(['aaaaaaa', 'bbbbbbb']);
   });
 
   it('attaches the merged pull request when several exist', async () => {
@@ -196,7 +217,7 @@ describe('findCandidateCommits', () => {
     });
   });
 
-  it('sorts newest first, then by sha, so the same input always ranks the same', async () => {
+  it('sorts within bucket by newest first, then by sha, so the same input always orders the same', async () => {
     const first = await findCandidateCommits(
       sourceWith([
         rawCommit({ sha: 'cccccccccccccccccccccccccccccccccccccccc', committedAt: WINDOW.from }),

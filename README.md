@@ -128,9 +128,10 @@ See `.env.example`. The CLI loads `.env` automatically; shell-set variables win.
 ### Reading the candidate list
 
 Commits listed are **candidate commits**, not **Causes**. A matching key prefix in a path or
-message is a hint. Read **during** the growth first, then **before**; commits **after** the growth
-are kept so you can rule them out. Open the linked commits/PRs and search those diffs for the
-attributed key pattern or TTL-related writes — still not proof.
+message is a **Pattern hint**. The list is ordered **during** the growth first, then **before**
+it (Commit lookback) — timing groups for scanning, not a plausibility ranking. Open the linked
+commits/PRs and search those diffs for the attributed key pattern or TTL-related writes — still
+not proof.
 
 If you passed `--repo` and GitHub auth or the API fails, the Redis diagnosis still prints; the
 report records **GitHub unavailable**, candidates stay empty, and the process exits non-zero.

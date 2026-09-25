@@ -13,8 +13,16 @@ The Redis-side attribution for memory growth: a key pattern plus what changed ab
 _Avoid_: Commit, pull request, introducer, root cause (when used for Git)
 
 **Commit candidate**:
-A Git commit (and optional linked pull request) that falls in or near the anomaly window and may be worth a human look. Never a Cause. A matching key-prefix hint is textual coincidence, not proof. Candidates after the growth window are kept and labelled so they can be ruled out, not dropped.
-_Avoid_: Cause, most plausible commit, ranked commit, suspected cause
+A Git commit (and optional linked pull request) that falls in the anomaly window or in the Commit lookback before it, and may be worth a human look. Never a Cause. Never ranked by plausibility; listing may group by timing (within the window, then before it) only to make the shortlist scannable.
+_Avoid_: Cause, most plausible commit, ranked commit, suspected cause, near (as an undefined window)
+
+**Commit lookback**:
+The interval immediately before the anomaly window’s start that widens candidate search. It is not part of the anomaly window and does not extend after the window’s end.
+_Avoid_: anomaly window, grace period, after-anomaly window
+
+**Pattern hint**:
+A textual coincidence between a Key pattern and a commit message or changed path. Used only to make matching Commit candidates easier to notice; never proof of causation and never Redis evidence.
+_Avoid_: evidence, attribution, related commit (when implying ownership of the Cause)
 
 **Key pattern**:
 A grouped key-space prefix or shape inferred from the sample (for example `session:*`), used as the unit of growth attribution.

@@ -179,14 +179,10 @@ describe('runDiagnosis', () => {
 
     expect(report.repository).toBe('acme/checkout');
     expect(report.graph.gaps.map((gap) => gap.kind)).not.toContain('no-repository-connected');
-    expect(report.commitCandidates.map((candidate) => candidate.shortSha)).toEqual([
-      'bbbbbbb',
-      'aaaaaaa',
-    ]);
-    expect(report.commitCandidates[0]?.temporalRelation).toBe('after-anomaly');
-    expect(report.commitCandidates[1]?.temporalRelation).toBe('before-anomaly');
-    expect(report.commitCandidates[1]?.matchedPatternHints).toContain('cart:items:');
-    expect(report.commitCandidates[1]?.pullRequest?.number).toBe(9);
+    expect(report.commitCandidates.map((candidate) => candidate.shortSha)).toEqual(['aaaaaaa']);
+    expect(report.commitCandidates[0]?.temporalRelation).toBe('before-anomaly');
+    expect(report.commitCandidates[0]?.matchedPatternHints).toContain('cart:items:');
+    expect(report.commitCandidates[0]?.pullRequest?.number).toBe(9);
   });
 
   it('does not query GitHub until there are two snapshots', async () => {

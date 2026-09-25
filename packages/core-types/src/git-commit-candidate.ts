@@ -13,16 +13,15 @@ export interface GitPullRequestRef {
 }
 
 /**
- * Where a commit sits relative to the anomaly window. Commits at or before the growth are
- * eligible to list as related candidates; `'after-anomaly'` entries are kept so a report can
- * rule them out by timing rather than silently dropping them. Timing never makes a commit a Cause.
+ * Where a commit sits relative to the anomaly window. Only commits at or before the growth end
+ * are Commit candidates; commits after `window.to` are dropped, not labelled.
  */
-export type TemporalRelation = 'before-anomaly' | 'within-anomaly-window' | 'after-anomaly';
+export type TemporalRelation = 'before-anomaly' | 'within-anomaly-window';
 
 /**
- * A Commit candidate in or near the anomaly window. Explicitly not a Cause: this package ranks
- * nothing and concludes nothing. Redis Causes are decided only in `packages/evidence`; the
- * reasoner may list these SHAs as related candidates, never as the Cause.
+ * A Commit candidate in the anomaly window or the Commit lookback before it. Explicitly not a
+ * Cause: this package concludes nothing. Redis Causes are decided only in `packages/evidence`;
+ * the reasoner may list matching SHAs as `hintedCandidateShas`, never as the Cause.
  */
 export interface GitCommitCandidate {
   readonly sha: string;
@@ -36,7 +35,7 @@ export interface GitCommitCandidate {
   readonly changedPaths: readonly string[];
   /**
    * Key patterns whose prefixes appear in the diff or commit message (e.g. `session:`).
-   * A textual hint only — never treat a hint as proof of causation.
+   * A Pattern hint only — never treat a hint as proof of causation.
    */
   readonly matchedPatternHints: readonly string[];
   readonly temporalRelation: TemporalRelation;

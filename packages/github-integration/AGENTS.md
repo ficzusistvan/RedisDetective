@@ -37,6 +37,6 @@ PR picking) runs against a fake and is therefore deterministic.
   scopes which repos the App can see. Naming them again is how GitHub returns HTTP 422
   ("not accessible to the parent installation"). Request `contents: read` and
   `pull_requests: read` only.
-- **Keep `'after-anomaly'` commits.** Dropping them would hide the evidence that a change is too
-  late to fall in the growth window (rule-out by timing, not causation).
+- **Drop commits after the anomaly window end.** They are outside the Commit candidate window;
+  listing them for “rule-out” promised a product behaviour the search did not deliver.
 - Tests live in `test/*.test.ts` and inject fakes. No live API, no token, no rate limit.

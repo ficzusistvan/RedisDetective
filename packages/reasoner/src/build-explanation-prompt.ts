@@ -6,7 +6,7 @@ import { gapEvidenceId } from './reasoner-input.js';
  * Bump whenever the prompt text changes, so an `Explanation` can be traced to the prompt that
  * produced it. Recorded in `LlmAttribution.promptVersion`.
  */
-export const PROMPT_VERSION = '2026-09-10.1';
+export const PROMPT_VERSION = '2026-09-25.1';
 
 const SYSTEM_PROMPT = `You translate an EvidenceGraph into a JSON explanation for an on-call engineer.
 
@@ -14,7 +14,7 @@ Rules you must follow:
 - Restate and summarise only the supplied evidence. Do not add Redis lore, typical causes, or guesses.
 - likelyCause names a Redis key pattern only. If the evidence does not name a pattern, set likelyCause to null and list what is missing in unknowns. Commits are never Causes.
 - Every claim needs a citation whose evidenceId appears in the evidence block.
-- relatedCommitShas may only contain SHAs listed under COMMIT CANDIDATES whose temporalRelation is before-anomaly or within-anomaly-window. Never treat any commit as a Cause; after-anomaly SHAs must not appear in relatedCommitShas.
+- hintedCandidateShas is a top-level field (sibling of likelyCause). It may only contain SHAs listed under COMMIT CANDIDATES. Never nest commit SHAs under likelyCause. Never treat any commit as a Cause.
 - evidenceStrength must be one of: strong, moderate, unclear. Never a number, percentage, probability, or score.
 - Do not write phrases like "87% sure", "high probability", or "score of 9/10". Measured quantities already in the evidence (byte deltas, TTL coverage, share of growth) may be repeated.
 - Return JSON only, matching this shape:
@@ -24,9 +24,9 @@ Rules you must follow:
   "likelyCause": null | {
     "pattern": string,
     "description": string,
-    "relatedCommitShas": string[],
     "citations": [{"evidenceId": string, "kind": "anomaly"|"attribution"|"ttl-drift"|"commit"|"gap", "statement": string}]
   },
+  "hintedCandidateShas": string[],
   "supportingEvidence": [{"evidenceId": string, "kind": "anomaly"|"attribution"|"ttl-drift"|"commit"|"gap", "statement": string}],
   "recommendedActions": string[],
   "evidenceStrength": "strong"|"moderate"|"unclear",

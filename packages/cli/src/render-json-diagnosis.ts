@@ -64,13 +64,13 @@ export function renderJsonDiagnosis(report: DiagnosisReport): string {
             : {
                 pattern: report.explanation.likelyCause.pattern,
                 description: report.explanation.likelyCause.description,
-                relatedCommitShas: report.explanation.likelyCause.relatedCommitShas,
                 citations: report.explanation.likelyCause.citations.map((citation) => ({
                   evidenceId: citation.evidenceId,
                   kind: citation.kind,
                   statement: citation.statement,
                 })),
               },
+        hintedCandidateShas: report.explanation.hintedCandidateShas,
         supportingEvidence: report.explanation.supportingEvidence.map((citation) => ({
           evidenceId: citation.evidenceId,
           kind: citation.kind,

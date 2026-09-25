@@ -39,6 +39,7 @@ export function explanationFixture(overrides: Partial<Explanation> = {}): Explan
     headline: 'Memory grew and the cause is not yet established.',
     summary: 'Scaffolding fixture.',
     likelyCause: null,
+    hintedCandidateShas: [],
     supportingEvidence: [],
     recommendedActions: [],
     evidenceStrength: 'unclear',
@@ -143,7 +144,6 @@ export function validLlmJson(overrides: Record<string, unknown> = {}): string {
     likelyCause: {
       pattern: 'cart:items:*',
       description: 'TTLs disappeared on cart:items:* and that pattern accounts for most of the growth.',
-      relatedCommitShas: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
       citations: [
         {
           evidenceId: 'attribution-cart-items',
@@ -152,6 +152,7 @@ export function validLlmJson(overrides: Record<string, unknown> = {}): string {
         },
       ],
     },
+    hintedCandidateShas: ['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'],
     supportingEvidence: [
       {
         evidenceId: 'ttl-drift-cart-items',

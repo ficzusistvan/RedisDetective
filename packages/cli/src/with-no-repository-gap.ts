@@ -3,9 +3,9 @@ import type { EvidenceGap, EvidenceGraph } from '@redis-detective/core-types';
 const NO_REPOSITORY_GAP: EvidenceGap = {
   kind: 'no-repository-connected',
   detail:
-    'No GitHub repository was connected, so no commit can be named as a candidate for the growth.',
+    'No GitHub repository was connected, so Commit candidates in the growth window were not listed.',
   remedy:
-    'When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis.',
+    'When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis. Connecting a repo lists Commit candidates for a human look — it does not name a Git Cause.',
 };
 
 /**

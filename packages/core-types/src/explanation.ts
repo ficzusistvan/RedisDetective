@@ -15,14 +15,13 @@ export interface ExplanationCitation {
   readonly statement: string;
 }
 
+/**
+ * Redis-side Cause wording only. Commit candidate SHAs live on `Explanation.hintedCandidateShas`,
+ * not here — nesting them under the cause smuggled ownership language past the glossary.
+ */
 export interface ExplanationCause {
   readonly pattern: string;
   readonly description: string;
-  /**
-   * Related commit-candidate SHAs drawn from the supplied `GitCommitCandidate[]`. Never
-   * synthesised. These are Commit candidates linked for a human look — never part of the Cause.
-   */
-  readonly relatedCommitShas: readonly string[];
   readonly citations: readonly ExplanationCitation[];
 }
 
@@ -45,6 +44,12 @@ export interface Explanation {
   readonly summary: string;
   /** `null` when the evidence does not support naming a cause. That is a valid answer. */
   readonly likelyCause: ExplanationCause | null;
+  /**
+   * Commit-candidate SHAs with a Pattern hint for the named Cause, drawn from the supplied
+   * `GitCommitCandidate[]`. Never synthesised. Sibling of `likelyCause` on purpose: these are
+   * Commit candidates for a human look — never part of the Cause.
+   */
+  readonly hintedCandidateShas: readonly string[];
   readonly supportingEvidence: readonly ExplanationCitation[];
   readonly recommendedActions: readonly string[];
 

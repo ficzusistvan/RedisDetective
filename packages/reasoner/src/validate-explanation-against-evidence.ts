@@ -8,7 +8,7 @@ export const EXPLANATION_VIOLATION_KINDS = [
   'unknown-evidence-id',
   /** A named cause references a pattern that appears in no attribution or drift event. */
   'unsupported-pattern',
-  /** A related commit SHA was not among the supplied candidates, or landed after the growth. */
+  /** A hinted candidate SHA was not among the supplied Commit candidates. */
   'unsupported-commit',
   /** A substantive claim carries no citation at all. */
   'uncited-claim',
@@ -57,11 +57,7 @@ export function validateExplanationAgainstEvidence(
     ...input.graph.attributions.map((attribution) => attribution.pattern),
     ...input.graph.ttlDrift.map((event) => event.pattern),
   ]);
-  const allowedCommitShas = new Set(
-    input.commitCandidates
-      .filter((candidate) => candidate.temporalRelation !== 'after-anomaly')
-      .map((candidate) => candidate.sha),
-  );
+  const allowedCommitShas = new Set(input.commitCandidates.map((candidate) => candidate.sha));
 
   const citations = [
     ...explanation.supportingEvidence,
@@ -93,14 +89,15 @@ export function validateExplanationAgainstEvidence(
         offendingText: explanation.likelyCause.description,
       });
     }
-    for (const sha of explanation.likelyCause.relatedCommitShas) {
-      if (!allowedCommitShas.has(sha)) {
-        violations.push({
-          kind: 'unsupported-commit',
-          detail: `relatedCommitSha "${sha}" is not a supplied candidate that landed at or before the growth.`,
-          offendingText: sha,
-        });
-      }
+  }
+
+  for (const sha of explanation.hintedCandidateShas) {
+    if (!allowedCommitShas.has(sha)) {
+      violations.push({
+        kind: 'unsupported-commit',
+        detail: `hintedCandidateSha "${sha}" is not among the supplied Commit candidates.`,
+        offendingText: sha,
+      });
     }
   }
 

@@ -7,7 +7,7 @@
 That is the entire product surface. A useful answer names a **key pattern** (`session:*`,
 `cart:items:*`), says **how much** of the growth it accounts for, says **what changed** about it
 (more keys, bigger values, or keys that stopped expiring), and — when a repository is connected —
-lists **commit candidates** in the growth window (never ranked or worded as the Cause).
+lists **commit candidates** in the growth window or the lookback before it (never ranked or worded as the Cause).
 
 Anything that does not move toward that answer is not in scope yet, however adjacent it looks.
 
@@ -18,7 +18,8 @@ Anything that does not move toward that answer is not in scope yet, however adja
 2. Repeated runs over time produce snapshots that can be diffed into an `EvidenceGraph`.
 3. The `EvidenceGraph` identifies the key pattern responsible for growth, and flags TTL drift
    (keys losing their expiration) as a distinct, named cause.
-4. With a repo connected, the report names candidate commits in the window where the growth began.
+4. With a repo connected, the report names candidate commits in the window where the growth began
+   (and the lookback before it).
 5. Every claim in the report is traceable to a specific piece of evidence, and evidence strength is
    stated qualitatively (`strong` / `moderate` / `unclear`) — never as a number.
 6. Nothing the tool does can degrade the Redis instance it is inspecting.
@@ -60,13 +61,14 @@ either.
    through `buildEvidenceGraph`. Offline diagnosis from stored files, no Redis connection, is
    supported. **Done.** The `watch` command runs that same path on an interval, so the series a
    diagnosis needs can accumulate without the user re-running the command by hand.
-6. **`github-integration`** — GitHub App auth and candidate commit lookup in the anomaly window.
-   **Done:** App credentials from the environment, installation-token exchange, REST commit listing
-   against an injected HTTP client, and candidate classification (temporal relation + pattern
-   hints). `--repo owner/repo` on a diagnosis lists candidates without ranking them as causes.
-   When a named Cause has strong or moderate evidence and no repo is connected, the report records
-   a `no-repository-connected` gap. If `--repo` is set but GitHub fails, the Redis diagnosis still
-   prints with a `github-unavailable` gap (non-zero exit).
+6. **`github-integration`** — GitHub App auth and candidate commit lookup in the anomaly window
+   or the Commit lookback before it. **Done:** App credentials from the environment,
+   installation-token exchange, REST commit listing against an injected HTTP client, and candidate
+   classification (temporal relation + Pattern hints). `--repo owner/repo` on a diagnosis lists
+   candidates without ranking them as causes. When a named Cause has strong or moderate evidence
+   and no repo is connected, the report records a `no-repository-connected` gap. If `--repo` is
+   set but GitHub fails, the Redis diagnosis still prints with a `github-unavailable` gap
+   (non-zero exit).
 7. **`reasoner`** — turn an `EvidenceGraph` into prose. **Done:** a deterministic template
    explanation is always produced (`model: null`). If `LLM_API_KEY` is set, an OpenAI-compatible
    client may reword it; `validateExplanationAgainstEvidence` rejects invented patterns, commits,

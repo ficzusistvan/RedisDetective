@@ -99,16 +99,20 @@ function toCandidate(
   };
 }
 
+const TEMPORAL_SORT_RANK = {
+  'within-anomaly-window': 0,
+  'before-anomaly': 1,
+} as const;
+
 /**
- * Finds commit candidates in or near an anomaly window.
+ * Finds commit candidates in the anomaly window or the Commit lookback before it.
  *
- * Returns **candidates**, in a defined order, and concludes nothing. Temporal proximity and a
- * matching key prefix are hints only — a refactor that merely renamed a constant will match just
- * as strongly as a change that actually altered Redis writes. Ranking a hint as a Cause here would
- * let a guess reach the user wearing the authority of evidence.
+ * Returns **candidates**, in a defined scan order, and concludes nothing. Temporal proximity and a
+ * matching key prefix are Pattern hints only — a refactor that merely renamed a constant will
+ * match just as strongly as a change that actually altered Redis writes. Ordering is for
+ * scanability (within the window, then before it), never a plausibility ranking.
  *
- * `'after-anomaly'` commits are kept so a report can explicitly rule them out by timing. They are
- * not dropped, and they are not ranked below the others here — ranking is a conclusion.
+ * Commits after `anomalyWindow.to` are dropped silently — they are outside the candidate window.
  */
 export async function findCandidateCommits(
   source: GitHubCommitSource,
@@ -149,6 +153,7 @@ export async function findCandidateCommits(
 
   return candidates.sort(
     (left, right) =>
+      TEMPORAL_SORT_RANK[left.temporalRelation] - TEMPORAL_SORT_RANK[right.temporalRelation] ||
       Date.parse(right.committedAt) - Date.parse(left.committedAt) ||
       left.sha.localeCompare(right.sha),
   );

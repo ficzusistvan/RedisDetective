@@ -124,7 +124,7 @@ describe('renderTextDiagnosis', () => {
     expect(renderTextDiagnosis(report)).toContain('stored snapshots only');
   });
 
-  it('lists candidate commits as hints and labels commits that landed too late', async () => {
+  it('lists candidate commits as hints and omits commits that landed after the growth', async () => {
     const report = await runDiagnosis({
       store: createMemorySnapshotStore(leakingSnapshots()),
       generatedAt: '2026-08-25T14:00:00.000Z',
@@ -151,11 +151,12 @@ describe('renderTextDiagnosis', () => {
     expect(text).toContain('Candidate commits');
     expect(text).toContain('acme/checkout');
     expect(text).toContain('hint, not proof');
-    expect(text).toContain('Read during the growth first, then before');
+    expect(text).toContain('Listed during the growth first, then before');
     expect(text).toContain('search those diffs for the attributed key pattern');
     expect(text).toContain('stop dropping EX on cart items');
     expect(text).toContain('before the growth');
-    expect(text).toContain('too late to fall in the growth window');
+    expect(text).not.toContain('docs: changelog');
+    expect(text).not.toContain('too late to fall in the growth window');
     expect(text).not.toContain('No repository connected');
   });
 });

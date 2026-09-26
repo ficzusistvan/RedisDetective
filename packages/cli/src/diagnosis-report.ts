@@ -39,10 +39,15 @@ export interface DiagnosisReport {
   readonly graph: EvidenceGraph;
   /**
    * Commits that *might* relate to the growth. Empty when no repository was connected, when there
-   * were fewer than two snapshots (no window to search), or when GitHub returned nothing. Never
-   * ranked as a cause.
+   * were fewer than two snapshots, when the window had no memory growth (lookup skipped), when
+   * GitHub failed, or when GitHub returned nothing. Never ranked as a cause.
    */
   readonly commitCandidates: readonly GitCommitCandidate[];
+  /**
+   * True when a Connected repository was set but GitHub was not contacted because the evidence
+   * graph recorded `no-growth-detected`. Exit remains success; this is not `github-unavailable`.
+   */
+  readonly commitLookupSkippedBecauseNoGrowth: boolean;
   /**
    * The paragraph form of this diagnosis. Always present: either the deterministic template or
    * an LLM wording that passed `validateExplanationAgainstEvidence`. Adds wording, never facts.

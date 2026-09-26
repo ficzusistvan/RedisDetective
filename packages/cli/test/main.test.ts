@@ -146,6 +146,7 @@ describe('main', () => {
       expect(help).toContain('Solo fallback');
       expect(help).toContain('gh auth');
       expect(help).toContain('GITHUB_TOKEN');
+      expect(help).toContain('memory growth');
       expect(help).toContain('.env');
       expect(help).toContain('LLM_API_KEY');
     });

@@ -70,8 +70,10 @@ Options
                           token, or GITHUB_TOKEN / GH_TOKEN. Credentials come from the environment
                           (including a .env file) or from gh. Install an App with Contents: Read
                           and Pull requests: Read; no webhooks needed. Commits listed are
-                          candidates, not causes. If GitHub fails after two or more snapshots, the
-                          Redis diagnosis still prints (exit 6).
+                          candidates, not causes. Lookup runs only with two or more snapshots and
+                          when the window shows memory growth; a flat series skips GitHub (exit 0).
+                          If GitHub fails when candidates were expected, the Redis diagnosis still
+                          prints (exit 6).
       --lookback-hours <n>
                           Hours before the growth window to include in the commit search
                           (default ${String(DEFAULT_COMMIT_LOOKBACK_HOURS)}, i.e. ${String(DEFAULT_COMMIT_LOOKBACK_HOURS / 24)} days). Widen when deploys are rarer. Requires --repo.

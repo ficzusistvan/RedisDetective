@@ -27,6 +27,7 @@ export function renderJsonDiagnosis(report: DiagnosisReport): string {
       savedLocation: report.savedLocation,
       repository: report.repository,
       lookbackHours: report.lookbackHours,
+      commitLookupSkippedBecauseNoGrowth: report.commitLookupSkippedBecauseNoGrowth,
       snapshots: report.snapshots.map(serializeSnapshot),
       commitCandidates: report.commitCandidates.map((candidate) => ({
         sha: candidate.sha,

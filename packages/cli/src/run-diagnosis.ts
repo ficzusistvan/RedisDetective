@@ -97,10 +97,10 @@ function isGitHubFailure(error: unknown): boolean {
  * pretending otherwise is how a health check would start making causal claims. The renderer says
  * so and tells the user to run again later.
  *
- * Commit lookup and GitHub auth are deferred until there are two snapshots: there is no growth
- * window to search, and listing recent commits would look like an answer to a question that has
- * not been asked yet. Exit code 6 (GitHub unavailable) therefore only applies when candidates
- * were expected.
+ * Commit lookup and GitHub auth are deferred until there are two snapshots *and* the window is
+ * not a flat `no-growth-detected` series: there is no growth window to search, and listing recent
+ * commits would look like an answer to a question that has not been asked. Exit code 6 (GitHub
+ * unavailable) therefore only applies when candidates were expected.
  *
  * When a repository was requested but GitHub cannot be reached, the Redis report is still produced
  * with a `github-unavailable` gap and empty candidates — never a hard failure that hides the Cause.
@@ -136,11 +136,13 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
       repository: null,
       lookbackHours: null,
       commitCandidates: [],
+      commitLookupSkippedBecauseNoGrowth: false,
     });
   }
 
   const repositoryLabel = formatRepositoryRef(repository);
   const lookbackHours = hoursFromMs(lookbackMs);
+  const noGrowthDetected = graph.gaps.some((gap) => gap.kind === 'no-growth-detected');
 
   if (githubUnavailableDetail !== undefined) {
     return finishDiagnosis(request, {
@@ -150,20 +152,21 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
       repository: repositoryLabel,
       lookbackHours,
       commitCandidates: [],
+      commitLookupSkippedBecauseNoGrowth: false,
     });
   }
 
   let commitCandidates: DiagnosisReport['commitCandidates'] = [];
   let resultGraph = graph;
 
-  if (snapshots.length >= 2) {
+  if (snapshots.length >= 2 && !noGrowthDetected) {
     try {
       const commitSource =
         request.commitSource ??
         (request.createCommitSource === undefined ? undefined : await request.createCommitSource());
       if (commitSource === undefined) {
         throw new Error(
-          'A GitHub commit source is required when a repository is connected and at least two snapshots exist.',
+          'A GitHub commit source is required when a repository is connected and at least two snapshots exist with growth to attribute.',
         );
       }
       commitCandidates = await findCandidateCommits(commitSource, {
@@ -190,6 +193,7 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
     repository: repositoryLabel,
     lookbackHours,
     commitCandidates,
+    commitLookupSkippedBecauseNoGrowth: noGrowthDetected,
   });
 }
 
@@ -202,6 +206,7 @@ async function finishDiagnosis(
     readonly repository: string | null;
     readonly lookbackHours: number | null;
     readonly commitCandidates: DiagnosisReport['commitCandidates'];
+    readonly commitLookupSkippedBecauseNoGrowth: boolean;
   },
 ): Promise<DiagnosisReport> {
   const explanation = await explainEvidence(
@@ -223,6 +228,7 @@ async function finishDiagnosis(
     snapshots: assembled.snapshots,
     graph: assembled.graph,
     commitCandidates: assembled.commitCandidates,
+    commitLookupSkippedBecauseNoGrowth: assembled.commitLookupSkippedBecauseNoGrowth,
     explanation,
   };
 }

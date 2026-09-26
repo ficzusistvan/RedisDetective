@@ -162,7 +162,7 @@ function renderCandidate(candidate: GitCommitCandidate, index: number): string {
  * one as the cause here would let a guess reach the user wearing the authority of evidence.
  */
 function renderCommitCandidates(report: DiagnosisReport): string | null {
-  if (report.repository === null) {
+  if (report.repository === null || report.commitLookupSkippedBecauseNoGrowth) {
     return null;
   }
 
@@ -208,6 +208,12 @@ function renderExplanation(report: DiagnosisReport): string {
     }
   } else {
     lines.push('', `Named cause  none  ${strengthTag(explanation.evidenceStrength)}`);
+  }
+  if (report.commitLookupSkippedBecauseNoGrowth) {
+    lines.push(
+      '',
+      'Commit lookup skipped: no memory growth in this window (Connected repository was set; GitHub was not contacted).',
+    );
   }
   if (explanation.recommendedActions.length > 0) {
     lines.push('', 'What to do');

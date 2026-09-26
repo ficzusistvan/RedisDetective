@@ -159,6 +159,33 @@ describe('renderTextDiagnosis', () => {
     expect(text).not.toContain('too late to fall in the growth window');
     expect(text).not.toContain('No repository connected');
   });
+
+  it('notes that commit lookup was skipped when the window has no growth', async () => {
+    const report = await runDiagnosis({
+      store: createMemorySnapshotStore([
+        snapshotFixture({ snapshotId: 'a', capturedAt: '2026-08-25T10:00:00.000Z' }),
+        snapshotFixture({ snapshotId: 'b', capturedAt: '2026-08-25T11:00:00.000Z' }),
+      ]),
+      generatedAt: '2026-08-25T14:00:00.000Z',
+      target: null,
+      sampleSize: null,
+      timeoutMs: null,
+      memorySamples: null,
+      databases: null,
+      redactKeys: false,
+      repository: { owner: 'acme', repo: 'checkout' },
+      createCommitSource: () => Promise.resolve(fakeGitHubCommitSource([rawCommit()])),
+    });
+
+    const text = renderTextDiagnosis(report);
+
+    expect(report.commitLookupSkippedBecauseNoGrowth).toBe(true);
+    expect(text).toContain('Commit lookup skipped: no memory growth');
+    expect(text).toContain('Repository');
+    expect(text).toContain('acme/checkout');
+    expect(text).not.toContain('Candidate commits');
+    expect(text).not.toContain('GitHub unavailable');
+  });
 });
 
 describe('renderJsonDiagnosis', () => {
@@ -174,6 +201,7 @@ describe('renderJsonDiagnosis', () => {
       repository: null,
       lookbackHours: null,
       commitCandidates: [],
+      commitLookupSkippedBecauseNoGrowth: false,
     });
   });
 

@@ -96,6 +96,32 @@ describe('runDiagnosis', () => {
     expect(report.graph.anomalies).toEqual([]);
     expect(report.graph.gaps.map((gap) => gap.kind)).toContain('no-growth-detected');
     expect(report.graph.gaps.map((gap) => gap.kind)).not.toContain('no-repository-connected');
+    expect(report.commitLookupSkippedBecauseNoGrowth).toBe(false);
+  });
+
+  it('skips GitHub when --repo is set but the series has no memory growth', async () => {
+    let created = false;
+    const snapshots = [
+      snapshotFixture({ snapshotId: 'a', capturedAt: '2026-08-25T10:00:00.000Z' }),
+      snapshotFixture({ snapshotId: 'b', capturedAt: '2026-08-25T11:00:00.000Z' }),
+    ];
+
+    const report = await runDiagnosis(
+      request(createMemorySnapshotStore(snapshots), {
+        repository: { owner: 'acme', repo: 'checkout' },
+        createCommitSource: () => {
+          created = true;
+          return Promise.resolve(fakeGitHubCommitSource());
+        },
+      }),
+    );
+
+    expect(created).toBe(false);
+    expect(report.repository).toBe('acme/checkout');
+    expect(report.commitCandidates).toEqual([]);
+    expect(report.commitLookupSkippedBecauseNoGrowth).toBe(true);
+    expect(report.graph.gaps.map((gap) => gap.kind)).toContain('no-growth-detected');
+    expect(report.graph.gaps.map((gap) => gap.kind)).not.toContain('github-unavailable');
   });
 
   it('records github-unavailable and keeps the Redis Cause when commit lookup fails', async () => {

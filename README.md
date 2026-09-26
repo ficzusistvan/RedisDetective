@@ -128,8 +128,9 @@ and pull requests on the Connected repository — we do not inspect token scopes
 **complete**, the App is used and personal tokens are ignored.
 
 See `.env.example`. The CLI loads `.env` automatically; shell-set variables win. GitHub auth runs
-only once there are **two or more** snapshots; with a single snapshot, `--repo` is recorded but
-no token exchange happens.
+only once there are **two or more** snapshots **and** the window shows memory growth. With a
+single snapshot, or a flat `no-growth-detected` series, `--repo` is recorded but GitHub is not
+contacted.
 
 ### Reading the candidate list
 
@@ -139,9 +140,10 @@ it (Commit lookback) — timing groups for scanning, not a plausibility ranking.
 commits/PRs and search those diffs for the attributed key pattern or TTL-related writes — still
 not proof.
 
-If you passed `--repo`, have two or more snapshots, and GitHub auth or the API fails, the Redis
-diagnosis still prints; the report records **GitHub unavailable**, candidates stay empty, and the
-process exits **6**.
+If you passed `--repo`, have two or more snapshots with growth to attribute, and GitHub auth or
+the API fails, the Redis diagnosis still prints; the report records **GitHub unavailable**,
+candidates stay empty, and the process exits **6**. A flat window skips commit lookup (exit 0)
+with a short note instead.
 
 ### CI footnote
 

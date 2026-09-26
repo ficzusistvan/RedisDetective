@@ -16,6 +16,7 @@ import type {
   WatchDeps,
 } from '@redis-detective/cli';
 import { GitHubApiError } from '@redis-detective/github-integration';
+import type { GitHubFetch } from '@redis-detective/github-integration';
 import { SAMPLER_DEFAULTS, SAMPLER_HARD_LIMITS } from '@redis-detective/sampler';
 import { leakingSnapshots } from './helpers/leaking-snapshots.js';
 import { fakeGitHubCommitSource, rawCommit } from './helpers/fake-github-commit-source.js';
@@ -54,6 +55,7 @@ async function run(
     readonly openSnapshotStore?: OpenSnapshotStore;
     readonly createCommitSource?: CreateCommitSource;
     readonly readGhAuthToken?: () => Promise<string | null>;
+    readonly githubFetch?: GitHubFetch;
     readonly stopSignal?: AbortSignal;
     readonly watchDeps?: WatchDeps;
   } = {},
@@ -78,6 +80,7 @@ async function run(
       (() => Promise.resolve({ client: leakyInstance(), close: () => Promise.resolve() })),
     // Never shell out to `gh` in this suite.
     readGhAuthToken: options.readGhAuthToken ?? (() => Promise.resolve(null)),
+    ...(options.githubFetch === undefined ? {} : { githubFetch: options.githubFetch }),
     ...(options.openSnapshotStore === undefined
       ? {}
       : { openSnapshotStore: options.openSnapshotStore }),
@@ -142,6 +145,7 @@ describe('main', () => {
     it('documents --repo with App preferred and solo gh/token fallback', async () => {
       const help = (await run(['--help'])).out;
       expect(help).toContain('--repo');
+      expect(help).toContain('--skip-gh');
       expect(help).toContain('GitHub App');
       expect(help).toContain('Solo fallback');
       expect(help).toContain('gh auth');
@@ -332,6 +336,50 @@ describe('main', () => {
       expect(result.out).not.toContain('No repository connected');
     });
 
+    it('uses GITHUB_TOKEN and does not use gh when --skip-gh is set', async () => {
+      const seenAuth: string[] = [];
+      const githubFetch: GitHubFetch = (_url, init) => {
+        seenAuth.push(init.headers['Authorization'] ?? '');
+        return Promise.resolve({
+          status: 200,
+          headers: { get: () => null },
+          text: () => Promise.resolve('[]'),
+        });
+      };
+
+      const result = await run(['--snapshots', './snaps', '--repo', 'acme/checkout', '--skip-gh'], {
+        env: { GITHUB_TOKEN: 'from-env' },
+        openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+        readGhAuthToken: () => Promise.resolve('from-gh-cli'),
+        githubFetch,
+      });
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(seenAuth).toEqual(['Bearer from-env']);
+      expect(result.out).toContain('cart:items:*');
+    });
+
+    it('ignores a gh login when --skip-gh is set and no token is in the environment', async () => {
+      let fetched = false;
+      const result = await run(['--snapshots', './snaps', '--repo', 'acme/checkout', '--skip-gh'], {
+        openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+        readGhAuthToken: () => Promise.resolve('from-gh-cli'),
+        githubFetch: () => {
+          fetched = true;
+          return Promise.resolve({
+            status: 200,
+            headers: { get: () => null },
+            text: () => Promise.resolve('[]'),
+          });
+        },
+      });
+
+      expect(fetched).toBe(false);
+      expect(result.exitCode).toBe(EXIT_CODES.githubError);
+      expect(result.err).toContain('gh auth token is not consulted');
+      expect(result.out).toContain('cart:items:*');
+    });
+
     it('prints the Redis diagnosis when GitHub credentials are missing after --repo', async () => {
       const result = await run(['--snapshots', './snaps', '--repo', 'acme/checkout'], {
         openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
@@ -453,7 +501,15 @@ describe('main', () => {
       let commitSources = 0;
 
       const result = await run(
-        ['watch', '--url', 'redis://localhost:6379', '--snapshots', './snaps', '--repo', 'acme/checkout'],
+        [
+          'watch',
+          '--url',
+          'redis://localhost:6379',
+          '--snapshots',
+          './snaps',
+          '--repo',
+          'acme/checkout',
+        ],
         {
           openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
           createCommitSource: () => {

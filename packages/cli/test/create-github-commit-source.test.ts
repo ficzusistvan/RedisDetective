@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createGitHubCommitSource, resolvePersonalGitHubToken } from '@redis-detective/cli';
-import {
-  GitHubAuthConfigError,
-  isGitHubAppEnvComplete,
-} from '@redis-detective/github-integration';
+import { GitHubAuthConfigError, isGitHubAppEnvComplete } from '@redis-detective/github-integration';
 
 describe('resolvePersonalGitHubToken', () => {
   it('prefers gh auth token over env tokens', async () => {
@@ -36,6 +33,48 @@ describe('resolvePersonalGitHubToken', () => {
 describe('createGitHubCommitSource', () => {
   const repository = { owner: 'acme', repo: 'checkout' };
   const now = () => new Date('2026-08-25T12:00:00.000Z');
+
+  it('uses GITHUB_TOKEN instead of gh when gh discovery is skipped', async () => {
+    const seenAuth: string[] = [];
+    const source = await createGitHubCommitSource({
+      env: { GITHUB_TOKEN: 'from-env' },
+      repository,
+      now,
+      skipGh: true,
+      readGhAuthToken: () => Promise.resolve('from-gh-cli'),
+      fetchImpl: (_url, init) => {
+        seenAuth.push(init.headers['Authorization'] ?? '');
+        return Promise.resolve({
+          status: 200,
+          headers: { get: () => null },
+          text: () => Promise.resolve('[]'),
+        });
+      },
+    });
+
+    await source.listCommits({
+      repository,
+      window: { from: '2026-08-25T10:00:00.000Z', to: '2026-08-25T12:00:00.000Z' },
+      maxResults: 1,
+    });
+
+    expect(seenAuth).toEqual(['Bearer from-env']);
+  });
+
+  it('does not accept a gh login as a credential when gh discovery is skipped', async () => {
+    await expect(
+      createGitHubCommitSource({
+        env: {},
+        repository,
+        now,
+        skipGh: true,
+        readGhAuthToken: () => Promise.resolve('from-gh-cli'),
+        fetchImpl: () => {
+          throw new Error('fetch should not run');
+        },
+      }),
+    ).rejects.toThrow(/GITHUB_TOKEN[\s\S]*gh auth token is not consulted/);
+  });
 
   it('uses a personal token when App env is incomplete', async () => {
     const seenAuth: string[] = [];

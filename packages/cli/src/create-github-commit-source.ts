@@ -33,6 +33,11 @@ export interface CreateGitHubCommitSourceRequest {
    * Injected so tests never shell out to `gh`. Production defaults to `gh auth token`.
    */
   readonly readGhAuthToken?: ReadGhAuthToken;
+  /**
+   * When true, personal credentials come only from `GITHUB_TOKEN` / `GH_TOKEN`.
+   * A logged-in `gh` on the machine is not consulted. Laptop runs leave this unset.
+   */
+  readonly skipGh?: boolean;
 }
 
 /**
@@ -70,12 +75,14 @@ function readEnvToken(
  */
 export async function resolvePersonalGitHubToken(
   env: Readonly<Record<string, string | undefined>>,
-  deps: { readonly readGhAuthToken?: ReadGhAuthToken } = {},
+  deps: { readonly readGhAuthToken?: ReadGhAuthToken; readonly skipGh?: boolean } = {},
 ): Promise<string | null> {
-  const readGh = deps.readGhAuthToken ?? defaultReadGhAuthToken;
-  const fromGh = await readGh();
-  if (fromGh !== null) {
-    return fromGh;
+  if (deps.skipGh !== true) {
+    const readGh = deps.readGhAuthToken ?? defaultReadGhAuthToken;
+    const fromGh = await readGh();
+    if (fromGh !== null) {
+      return fromGh;
+    }
   }
   return (
     readEnvToken(env, GITHUB_PERSONAL_TOKEN_ENV_VARS.githubToken) ??
@@ -83,12 +90,19 @@ export async function resolvePersonalGitHubToken(
   );
 }
 
-function missingCredentialsMessage(): string {
+function missingCredentialsMessage(skipGh: boolean): string {
+  const preferred =
+    'Preferred: configure a GitHub App (GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and a private key).';
+  const access =
+    'Documented minimum access: read contents and pull requests on the Connected repository.';
+  const personal = skipGh
+    ? 'Set GITHUB_TOKEN or GH_TOKEN. gh auth token is not consulted.'
+    : 'Solo fallback: run `gh auth login` (uses `gh auth token`), or set GITHUB_TOKEN / GH_TOKEN.';
   return [
     'No GitHub credentials available for candidate commit lookup.',
-    'Preferred: configure a GitHub App (GITHUB_APP_ID, GITHUB_APP_INSTALLATION_ID, and a private key).',
-    'Solo fallback: run `gh auth login` (uses `gh auth token`), or set GITHUB_TOKEN / GH_TOKEN.',
-    'Documented minimum access: read contents and pull requests on the Connected repository.',
+    preferred,
+    personal,
+    access,
   ].join(' ');
 }
 
@@ -115,9 +129,10 @@ export async function createGitHubCommitSource(
 
   const token = await resolvePersonalGitHubToken(request.env, {
     ...(request.readGhAuthToken === undefined ? {} : { readGhAuthToken: request.readGhAuthToken }),
+    ...(request.skipGh === true ? { skipGh: true } : {}),
   });
   if (token === null) {
-    throw new GitHubAuthConfigError(missingCredentialsMessage());
+    throw new GitHubAuthConfigError(missingCredentialsMessage(request.skipGh === true));
   }
 
   return createGitHubRestCommitSource({ http, token });

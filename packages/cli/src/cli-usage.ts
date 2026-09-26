@@ -74,6 +74,9 @@ Options
                           when the window shows memory growth; a flat series skips GitHub (exit 0).
                           If GitHub fails when candidates were expected, the Redis diagnosis still
                           prints (exit 6).
+      --skip-gh           Do not consult \`gh auth token\`. Personal credentials are then
+                          GITHUB_TOKEN / GH_TOKEN only. REDIS_DETECTIVE_SKIP_GH=1 is the
+                          same switch. A complete GitHub App environment is unchanged.
       --lookback-hours <n>
                           Hours before the growth window to include in the commit search
                           (default ${String(DEFAULT_COMMIT_LOOKBACK_HOURS)}, i.e. ${String(DEFAULT_COMMIT_LOOKBACK_HOURS / 24)} days). Widen when deploys are rarer. Requires --repo.

@@ -20,6 +20,11 @@ export interface CliOptions {
   readonly databases: readonly number[] | null;
   readonly redactKeys: boolean;
   /**
+   * When true, personal GitHub credentials are `GITHUB_TOKEN` / `GH_TOKEN` only.
+   * `gh auth token` is not consulted. A complete GitHub App environment is unchanged.
+   */
+  readonly skipGh: boolean;
+  /**
    * Directory of snapshot files. When set, this run is a diagnosis: the sample is saved (if a URL
    * was given) and compared against whatever is already in the directory. `null` keeps the
    * single-snapshot health check.
@@ -53,6 +58,7 @@ interface MutableCliOptions {
   memorySamples: number | null;
   databases: readonly number[] | null;
   redactKeys: boolean;
+  skipGh: boolean;
   snapshotDirectory: string | null;
   repository: string | null;
   lookbackHours: number | null;
@@ -161,6 +167,7 @@ export function parseCliArgs(
     memorySamples: null,
     databases: null,
     redactKeys: false,
+    skipGh: false,
     snapshotDirectory: null,
     repository: null,
     lookbackHours: null,
@@ -213,6 +220,10 @@ export function parseCliArgs(
 
       case '--redact-keys':
         options.redactKeys = true;
+        break;
+
+      case '--skip-gh':
+        options.skipGh = true;
         break;
 
       case '--snapshots': {
@@ -299,6 +310,11 @@ export function parseCliArgs(
 
   if (options.redisUrl === null) {
     options.redisUrl = env['REDIS_URL'] ?? null;
+  }
+
+  if (!options.skipGh) {
+    const skipGh = env['REDIS_DETECTIVE_SKIP_GH']?.trim().toLowerCase();
+    options.skipGh = skipGh === '1' || skipGh === 'true';
   }
 
   if (options.repository === null && options.snapshotDirectory !== null) {

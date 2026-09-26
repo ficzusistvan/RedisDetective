@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import { CliUsageError, parseCliArgs } from '@redis-detective/cli';
 
+describe('parseCliArgs --skip-gh', () => {
+  it('defaults to consulting gh, and turns that off from the flag or the env', () => {
+    expect(parseCliArgs([], {}).skipGh).toBe(false);
+    expect(parseCliArgs(['--skip-gh'], {}).skipGh).toBe(true);
+    expect(parseCliArgs([], { REDIS_DETECTIVE_SKIP_GH: '1' }).skipGh).toBe(true);
+    expect(parseCliArgs([], { REDIS_DETECTIVE_SKIP_GH: 'true' }).skipGh).toBe(true);
+    expect(parseCliArgs([], { REDIS_DETECTIVE_SKIP_GH: '0' }).skipGh).toBe(false);
+  });
+});
+
 describe('parseCliArgs --redact-keys', () => {
   it('defaults to off and is enabled by the flag', () => {
     expect(parseCliArgs([], {}).redactKeys).toBe(false);

@@ -9,8 +9,9 @@ about an hour, and must not be logged, persisted, or interpolated into error mes
 
 When App environment is **incomplete**, the **CLI** (not this package’s business logic) may supply
 a bearer token from `gh auth token` / `GITHUB_TOKEN` / `GH_TOKEN` into
-`createGitHubRestCommitSource`. That dual-auth policy is ADR 0002. This package still must not
-call `gh` or invent a second HTTP stack for PATs — same REST source, different token.
+`createGitHubRestCommitSource`. `--skip-gh` omits `gh` and uses the token variables only. That
+dual-auth policy is ADR 0002. This package still must not call `gh` or invent a second HTTP stack
+for PATs — same REST source, different token.
 
 `GitHubCommitSource` is the read surface. `findCandidateCommits` takes one as an argument. Tests
 inject a fake; production (`packages/cli`) injects `createGitHubRestCommitSource`. This package
@@ -18,7 +19,7 @@ must not call `fetch` except inside `createGitHubHttp`, and `createGitHubHttp` r
 caller to pass `fetch` in — so a unit test cannot silently reach the network.
 
 Returns **candidates**, not causes. Temporal proximity and a matching key prefix are hints.
-Ranking a hint as *the* cause here would let a guess reach the user wearing the authority of
+Ranking a hint as _the_ cause here would let a guess reach the user wearing the authority of
 evidence.
 
 ## Why

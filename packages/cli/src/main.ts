@@ -8,7 +8,11 @@ import {
   GitHubRepositoryRefError,
   parseRepositoryRef,
 } from '@redis-detective/github-integration';
-import type { GitHubCommitSource, GitHubRepositoryRef } from '@redis-detective/github-integration';
+import type {
+  GitHubCommitSource,
+  GitHubFetch,
+  GitHubRepositoryRef,
+} from '@redis-detective/github-integration';
 import type { LlmClient } from '@redis-detective/reasoner';
 
 import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
@@ -56,9 +60,7 @@ export type OpenSnapshotStore = (directory: string) => SnapshotStore;
  * never reaches the network. Production authenticates via GitHub App (preferred) or personal
  * token / `gh` fallback.
  */
-export type CreateCommitSource = (
-  repository: GitHubRepositoryRef,
-) => Promise<GitHubCommitSource>;
+export type CreateCommitSource = (repository: GitHubRepositoryRef) => Promise<GitHubCommitSource>;
 
 export interface MainContext {
   readonly argv: readonly string[];
@@ -86,6 +88,11 @@ export interface MainContext {
    * to `gh auth token`.
    */
   readonly readGhAuthToken?: ReadGhAuthToken;
+  /**
+   * Injected so a diagnosis can authenticate to GitHub without reaching the network.
+   * Production uses `globalThis.fetch`.
+   */
+  readonly githubFetch?: GitHubFetch;
   /**
    * Injected so diagnosis can be exercised without a language-model provider. Production
    * constructs one from `LLM_API_KEY` when set.
@@ -161,9 +168,7 @@ export async function main(context: MainContext): Promise<ExitCode> {
   }
 
   if (options.lookbackHours !== null && options.repository === null) {
-    streams.writeError(
-      `--lookback-hours requires --repo.\nRun ${CLI_NAME} --help for usage.\n`,
-    );
+    streams.writeError(`--lookback-hours requires --repo.\nRun ${CLI_NAME} --help for usage.\n`);
     return EXIT_CODES.usageError;
   }
 
@@ -315,8 +320,7 @@ async function runDiagnosisCommand(
     databases: options.databases,
     redactKeys: options.redactKeys,
     repository: repositoryResult.repository,
-    lookbackMs:
-      (options.lookbackHours ?? DEFAULT_COMMIT_LOOKBACK_HOURS) * 60 * 60 * 1_000,
+    lookbackMs: (options.lookbackHours ?? DEFAULT_COMMIT_LOOKBACK_HOURS) * 60 * 60 * 1_000,
     ...(repositoryResult.createCommitSource === undefined
       ? {}
       : { createCommitSource: repositoryResult.createCommitSource }),
@@ -351,10 +355,13 @@ type ResolvedRepository =
     }
   | { readonly ok: false; readonly exitCode: ExitCode };
 
-function writeGitHubFailureStderr(streams: MainStreams, error: unknown): void {
+function writeGitHubFailureStderr(streams: MainStreams, error: unknown, skipGh: boolean): void {
   if (error instanceof GitHubAuthConfigError) {
+    const where = skipGh
+      ? 'Credentials are read from the environment (including a .env file in this directory or a parent). `gh auth token` is not consulted because --skip-gh is set.'
+      : 'Credentials are read from the environment (including a .env file in this directory or a parent), or from `gh auth token`.';
     streams.writeError(
-      `${error.message}\nCredentials are read from the environment (including a .env file in this directory or a parent), or from \`gh auth token\`. See README for App setup and the solo fallback.\n`,
+      `${error.message}\n${where} See README for App setup and the solo fallback.\n`,
     );
     return;
   }
@@ -394,10 +401,11 @@ async function resolveRepository(
         env: context.env,
         repository: repo,
         now: context.now,
-        fetchImpl: (url, init) => globalThis.fetch(url, init),
+        fetchImpl: context.githubFetch ?? ((url, init) => globalThis.fetch(url, init)),
         ...(context.readGhAuthToken === undefined
           ? {}
           : { readGhAuthToken: context.readGhAuthToken }),
+        ...(options.skipGh ? { skipGh: true } : {}),
       }));
 
   return {
@@ -407,7 +415,7 @@ async function resolveRepository(
       try {
         return await create(repository);
       } catch (error) {
-        writeGitHubFailureStderr(context.streams, error);
+        writeGitHubFailureStderr(context.streams, error, options.skipGh);
         throw error;
       }
     },

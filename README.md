@@ -125,7 +125,9 @@ window — never as Causes.
 **Solo fallback** (when App env is incomplete): run `gh auth login` (the CLI calls
 `gh auth token`), or set `GITHUB_TOKEN` / `GH_TOKEN`. Documented minimum access is read contents
 and pull requests on the Connected repository — we do not inspect token scopes. If App env is
-**complete**, the App is used and personal tokens are ignored.
+**complete**, the App is used and personal tokens are ignored. `--skip-gh` (or
+`REDIS_DETECTIVE_SKIP_GH=1`) does not call `gh`; personal credentials are then the token
+variables only. Leave it unset on a laptop.
 
 See `.env.example`. The CLI loads `.env` automatically; shell-set variables win. GitHub auth runs
 only once there are **two or more** snapshots **and** the window shows memory growth. With a

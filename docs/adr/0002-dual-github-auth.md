@@ -15,6 +15,10 @@ already have `gh` or a fine-grained token.
 - When App environment is **incomplete**, discover a personal credential in order:
   `gh auth token` → `GITHUB_TOKEN` → `GH_TOKEN`. Do not invent a product-specific token env var.
   Do not inspect token scopes; document the minimum (contents + pull requests read).
+- `--skip-gh` (or `REDIS_DETECTIVE_SKIP_GH=1`) skips `gh auth token` and reads only
+  `GITHUB_TOKEN` / `GH_TOKEN`. The local default is unchanged. A hosted runner sets the switch
+  so a `gh` login on the server cannot authenticate a customer's repository. A complete App
+  environment still wins and never reaches this path.
 - CLI resolves credentials and builds a `GitHubCommitSource`; `gh` is injected so unit tests never
   shell out. Auth and commit listing run only when a Connected repository is set **and** there are
   at least two snapshots. Exit code 6 (GitHub unavailable) applies only when candidates were

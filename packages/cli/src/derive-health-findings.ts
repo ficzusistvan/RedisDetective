@@ -100,19 +100,20 @@ function deriveEvictionFinding(snapshot: RedisSnapshot): HealthFinding | null {
 
 function deriveHeadroomFinding(snapshot: RedisSnapshot): HealthFinding | null {
   const { maxmemoryBytes } = snapshot.instance;
-  if (maxmemoryBytes === null) {
+  const usedBytes = snapshot.memory.usedMemoryBytes;
+  if (maxmemoryBytes === null || usedBytes === null) {
     return null;
   }
 
-  const used = snapshot.memory.usedMemoryBytes / maxmemoryBytes;
+  const used = usedBytes / maxmemoryBytes;
   if (used < HEALTH_CHECK_THRESHOLDS.lowHeadroomRatio) {
     return null;
   }
 
   return {
     kind: 'low-headroom',
-    title: `Only ${formatBytes(maxmemoryBytes - snapshot.memory.usedMemoryBytes)} of headroom left`,
-    detail: `${formatBytes(snapshot.memory.usedMemoryBytes)} of ${formatBytes(maxmemoryBytes)} is in use (${formatPercent(used)}), with maxmemory-policy set to ${snapshot.instance.maxmemoryPolicy}.`,
+    title: `Only ${formatBytes(maxmemoryBytes - usedBytes)} of headroom left`,
+    detail: `${formatBytes(usedBytes)} of ${formatBytes(maxmemoryBytes)} is in use (${formatPercent(used)}), with maxmemory-policy set to ${snapshot.instance.maxmemoryPolicy}.`,
     evidenceStrength: measuredFindingStrength(),
     recommendedAction:
       snapshot.instance.maxmemoryPolicy === 'noeviction'
@@ -124,6 +125,8 @@ function deriveHeadroomFinding(snapshot: RedisSnapshot): HealthFinding | null {
 function deriveFragmentationFinding(snapshot: RedisSnapshot): HealthFinding | null {
   const { memFragmentationRatio, usedMemoryBytes, usedMemoryRssBytes } = snapshot.memory;
   if (
+    usedMemoryBytes === null ||
+    usedMemoryRssBytes === null ||
     memFragmentationRatio < HEALTH_CHECK_THRESHOLDS.highFragmentationRatio ||
     usedMemoryBytes < HEALTH_CHECK_THRESHOLDS.fragmentationFloorBytes
   ) {

@@ -74,6 +74,42 @@ describe('buildEvidenceGraph', () => {
       expect(graph.window).toEqual({ from: BUILT_AT, to: BUILT_AT });
     });
 
+    it('records memory-not-comparable for a resident zero instead of claiming no growth', () => {
+      const graph = build([
+        snapshotFixture({ snapshotId: 'a', capturedAt: hoursIn(0), usedMemoryBytes: 0 }),
+        snapshotFixture({ snapshotId: 'b', capturedAt: hoursIn(1), usedMemoryBytes: 0 }),
+      ]);
+
+      expect(graph.anomalies).toEqual([]);
+      expect(graph.gaps.map((gap) => gap.kind)).toEqual(['memory-not-comparable']);
+      expect(graph.gaps[0]?.detail).toContain('resident memory rather than an empty dataset');
+      expect(graph.gaps[0]?.remedy).toBeNull();
+    });
+
+    it('records memory-not-comparable when used_memory was not reported', () => {
+      const graph = build([
+        snapshotFixture({ snapshotId: 'a', capturedAt: hoursIn(0), usedMemoryBytes: null }),
+        snapshotFixture({ snapshotId: 'b', capturedAt: hoursIn(1), usedMemoryBytes: null }),
+      ]);
+
+      expect(graph.gaps.map((gap) => gap.kind)).toEqual(['memory-not-comparable']);
+      expect(graph.gaps[0]?.detail).toContain('did not report used_memory');
+    });
+
+    it('keeps no-growth-detected when the comparable readings are flat around a resident zero', () => {
+      const graph = build([
+        snapshotFixture({ snapshotId: 'a', capturedAt: hoursIn(0), usedMemoryBytes: 64 * MB }),
+        snapshotFixture({ snapshotId: 'cold', capturedAt: hoursIn(1), usedMemoryBytes: 0 }),
+        snapshotFixture({ snapshotId: 'b', capturedAt: hoursIn(2), usedMemoryBytes: 64 * MB }),
+      ]);
+
+      expect(graph.anomalies).toEqual([]);
+      expect(graph.gaps.map((gap) => gap.kind)).toEqual([
+        'memory-not-comparable',
+        'no-growth-detected',
+      ]);
+    });
+
     it('records no-growth-detected for a flat, well-observed window', () => {
       const graph = build(series([64 * MB, 64 * MB, 64 * MB]));
 
@@ -93,8 +129,7 @@ describe('buildEvidenceGraph', () => {
         leakingSeries(),
       ]) {
         const graph = build(snapshots);
-        const findings =
-          graph.anomalies.length + graph.attributions.length + graph.ttlDrift.length;
+        const findings = graph.anomalies.length + graph.attributions.length + graph.ttlDrift.length;
 
         expect(findings + graph.gaps.length).toBeGreaterThan(0);
       }

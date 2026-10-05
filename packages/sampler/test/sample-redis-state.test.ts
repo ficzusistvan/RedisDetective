@@ -119,6 +119,48 @@ describe('sampleRedisState', () => {
     expect(snapshot.sampling.warnings.join(' ')).toContain('MEMORY USAGE is unavailable');
   });
 
+  it('warns when used_memory is 0 and the keyspace still has keys', async () => {
+    const client = new FakeRedisCommandClient({
+      info: ['used_memory:0', 'db0:keys=2,expires=0,avg_ttl=0'].join('\r\n'),
+      databases: {
+        0: {
+          'session:1': { bytes: 10 },
+          'session:2': { bytes: 10 },
+        },
+      },
+    });
+
+    const snapshot = await sampleRedisState(client, {}, deterministicDeps(client));
+
+    expect(snapshot.memory.usedMemoryBytes).toBe(0);
+    expect(snapshot.keyspace[0]?.keyCount).toBe(2);
+    expect(snapshot.sampling.warnings.join(' ')).toContain('resident memory, not an empty dataset');
+  });
+
+  it('does not warn when used_memory is 0 and the keyspace is empty', async () => {
+    const client = new FakeRedisCommandClient({
+      info: 'used_memory:0\r\n',
+      databases: { 0: {} },
+    });
+
+    const snapshot = await sampleRedisState(client, {}, deterministicDeps(client));
+
+    expect(snapshot.memory.usedMemoryBytes).toBe(0);
+    expect(snapshot.sampling.warnings.join(' ')).not.toContain('resident memory');
+  });
+
+  it('records a missing used_memory as unknown and says so', async () => {
+    const client = new FakeRedisCommandClient({
+      info: 'db0:keys=1,expires=0,avg_ttl=0\r\n',
+      databases: { 0: { 'session:1': { bytes: 10 } } },
+    });
+
+    const snapshot = await sampleRedisState(client, {}, deterministicDeps(client));
+
+    expect(snapshot.memory.usedMemoryBytes).toBeNull();
+    expect(snapshot.sampling.warnings.join(' ')).toContain('absent from INFO');
+  });
+
   it('handles an empty instance', async () => {
     const client = new FakeRedisCommandClient({ databases: { 0: {} } });
 

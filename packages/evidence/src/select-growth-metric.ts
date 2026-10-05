@@ -1,5 +1,7 @@
 import type { RedisSnapshot } from '@redis-detective/core-types';
 
+import { totalKeyCount } from './total-key-count.js';
+
 /** The two `INFO memory` counters that can stand in for "how much data is stored". */
 export type GrowthMetric = 'used_memory_dataset' | 'used_memory';
 
@@ -29,9 +31,28 @@ export function selectGrowthMetric(snapshots: readonly RedisSnapshot[]): GrowthM
   return datasetIsReported ? 'used_memory_dataset' : 'used_memory';
 }
 
-/** Reads whichever counter `selectGrowthMetric` chose. */
-export function readGrowthMetric(snapshot: RedisSnapshot, metric: GrowthMetric): number {
+/** Reads whichever counter `selectGrowthMetric` chose. `null` when that field was not reported. */
+export function readGrowthMetric(snapshot: RedisSnapshot, metric: GrowthMetric): number | null {
   return metric === 'used_memory_dataset'
     ? snapshot.memory.usedMemoryDatasetBytes
     : snapshot.memory.usedMemoryBytes;
+}
+
+/**
+ * The byte counter to diff for growth, or `null` when this snapshot does not describe stored size.
+ *
+ * A missing counter is unknown. A counter of exactly 0 while `INFO keyspace` still reports keys is
+ * bytes resident in RAM, not an empty dataset: diffing that 0 would describe the data as having
+ * disappeared and then grown from nothing. A 0 alongside an empty keyspace is a real empty
+ * instance and stays 0, so growth from genuinely empty still compares as unbounded.
+ */
+export function comparableStoredBytes(
+  snapshot: RedisSnapshot,
+  metric: GrowthMetric,
+): number | null {
+  const bytes = readGrowthMetric(snapshot, metric);
+  if (bytes === null || (bytes === 0 && totalKeyCount(snapshot) > 0)) {
+    return null;
+  }
+  return bytes;
 }

@@ -14,7 +14,13 @@ import { createEvidenceId } from './create-evidence-id.js';
 import { detectMemoryAnomalies } from './detect-memory-anomalies.js';
 import { detectTtlDrift } from './detect-ttl-drift.js';
 import { resolveEvidenceOptions } from './evidence-options.js';
+import {
+  comparableStoredBytes,
+  readGrowthMetric,
+  selectGrowthMetric,
+} from './select-growth-metric.js';
 import { sortSnapshotsChronologically } from './sort-snapshots-chronologically.js';
+import { totalKeyCount } from './total-key-count.js';
 
 export interface BuildEvidenceGraphInput {
   readonly snapshots: readonly RedisSnapshot[];
@@ -98,6 +104,37 @@ function intervalGaps(
   }
 
   return gaps;
+}
+
+/**
+ * Snapshots whose memory counter cannot be diffed as stored size.
+ *
+ * The reading stays on the snapshot — a chart can still plot a real 0 — but growth comparison
+ * skips it. Saying "no growth" over a window that never had two stored-size readings would claim
+ * we measured something we did not.
+ */
+function memoryReadingGaps(snapshots: readonly RedisSnapshot[]): readonly EvidenceGap[] {
+  const metric = selectGrowthMetric(snapshots);
+  const excluded = snapshots.filter((snapshot) => comparableStoredBytes(snapshot, metric) === null);
+  if (excluded.length === 0) {
+    return [];
+  }
+
+  const details = excluded.map((snapshot) => {
+    const bytes = readGrowthMetric(snapshot, metric);
+    if (bytes === null) {
+      return `${snapshot.snapshotId} did not report ${metric}`;
+    }
+    return `${snapshot.snapshotId} reported ${metric} of 0 bytes while the keyspace still held ${totalKeyCount(snapshot)} keys, which is resident memory rather than an empty dataset`;
+  });
+
+  return [
+    {
+      kind: 'memory-not-comparable',
+      detail: `${details.join('; ')}. Those snapshots were left out of memory growth comparison.`,
+      remedy: null,
+    },
+  ];
 }
 
 /**
@@ -246,14 +283,22 @@ export function buildEvidenceGraph(input: BuildEvidenceGraphInput): EvidenceGrap
     ttlDrift,
   );
 
+  const growthMetric = selectGrowthMetric(snapshots);
+  const storedSizeReadings = snapshots.filter(
+    (snapshot) => comparableStoredBytes(snapshot, growthMetric) !== null,
+  ).length;
+
   const gaps: EvidenceGap[] = [
     ...sampleGaps(snapshots, options),
     ...intervalGaps(snapshots, options),
     ...comparabilityGaps(snapshots),
+    ...memoryReadingGaps(snapshots),
     ...attributionGaps(anomalies, attributions),
   ];
 
-  if (anomalies.length === 0 && ttlDrift.length === 0) {
+  // Two stored-size readings are what "we looked and the memory did not grow" is earned with. Fewer
+  // than that, and the memory-not-comparable gap is the honest result.
+  if (anomalies.length === 0 && ttlDrift.length === 0 && storedSizeReadings >= 2) {
     gaps.push({
       kind: 'no-growth-detected',
       detail: `No memory anomaly or TTL drift was found across ${snapshots.length} snapshots spanning ${window.from} to ${window.to}. Memory did not grow by more than the ${options.minGrowthBytes}-byte and ${options.minGrowthRatio} thresholds in any comparable interval.`,
@@ -271,7 +316,8 @@ export function buildEvidenceGraph(input: BuildEvidenceGraphInput): EvidenceGrap
     ttlDrift,
     // Stable order so two runs over the same snapshots produce byte-identical graphs.
     gaps: gaps.sort(
-      (left, right) => left.kind.localeCompare(right.kind) || left.detail.localeCompare(right.detail),
+      (left, right) =>
+        left.kind.localeCompare(right.kind) || left.detail.localeCompare(right.detail),
     ),
   };
 }

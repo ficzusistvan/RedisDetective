@@ -16,7 +16,11 @@ export {
 export { relativeChange } from './relative-change.js';
 export { ttlCoverage } from './ttl-coverage.js';
 export { totalKeyCount } from './total-key-count.js';
-export { readGrowthMetric, selectGrowthMetric } from './select-growth-metric.js';
+export {
+  comparableStoredBytes,
+  readGrowthMetric,
+  selectGrowthMetric,
+} from './select-growth-metric.js';
 export type { GrowthMetric } from './select-growth-metric.js';
 export { describeChange } from './describe-change.js';
 export type { ChangeUnit } from './describe-change.js';

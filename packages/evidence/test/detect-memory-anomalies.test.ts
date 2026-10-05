@@ -37,9 +37,93 @@ describe('detectMemoryAnomalies', () => {
     it('for a shrinking series', () => {
       expect(detectMemoryAnomalies(series([192 * MB, 64 * MB]), options)).toEqual([]);
     });
+
+    it('for a resident zero between two readings, which is not the dataset emptying', () => {
+      const anomalies = detectMemoryAnomalies(
+        [
+          snapshotFixture({
+            snapshotId: 'warm-before',
+            capturedAt: hoursIn(0),
+            usedMemoryBytes: 64 * MB,
+          }),
+          snapshotFixture({ snapshotId: 'cold', capturedAt: hoursIn(1), usedMemoryBytes: 0 }),
+          snapshotFixture({
+            snapshotId: 'warm-after',
+            capturedAt: hoursIn(2),
+            usedMemoryBytes: 64 * MB,
+          }),
+        ],
+        options,
+      );
+
+      expect(anomalies).toEqual([]);
+    });
+
+    it('for a missing used_memory followed by a real reading', () => {
+      const anomalies = detectMemoryAnomalies(
+        [
+          snapshotFixture({ snapshotId: 'missing', capturedAt: hoursIn(0), usedMemoryBytes: null }),
+          snapshotFixture({
+            snapshotId: 'later',
+            capturedAt: hoursIn(1),
+            usedMemoryBytes: 192 * MB,
+          }),
+        ],
+        options,
+      );
+
+      expect(anomalies.map((anomaly) => anomaly.kind)).not.toContain('memory-step-change');
+    });
   });
 
   describe('memory-step-change', () => {
+    it('still reports growth that started from a genuinely empty instance', () => {
+      const anomalies = detectMemoryAnomalies(
+        [
+          snapshotFixture({
+            snapshotId: 'empty',
+            capturedAt: hoursIn(0),
+            usedMemoryBytes: 0,
+            keyCount: 0,
+            patterns: [],
+          }),
+          snapshotFixture({ snapshotId: 'full', capturedAt: hoursIn(1), usedMemoryBytes: 64 * MB }),
+        ],
+        options,
+      );
+      const step = anomalies.find((anomaly) => anomaly.kind === 'memory-step-change');
+
+      expect(step?.snapshotIdBefore).toBe('empty');
+      expect(step?.valueBefore).toBe(0);
+      expect(step?.observations.join(' ')).toContain('from zero');
+    });
+
+    it('compares the stored-size readings on either side of a resident zero', () => {
+      const anomalies = detectMemoryAnomalies(
+        [
+          snapshotFixture({
+            snapshotId: 'warm-before',
+            capturedAt: hoursIn(0),
+            usedMemoryBytes: 64 * MB,
+          }),
+          snapshotFixture({ snapshotId: 'cold', capturedAt: hoursIn(1), usedMemoryBytes: 0 }),
+          snapshotFixture({
+            snapshotId: 'warm-after',
+            capturedAt: hoursIn(2),
+            usedMemoryBytes: 192 * MB,
+          }),
+        ],
+        options,
+      );
+      const step = anomalies.find((anomaly) => anomaly.kind === 'memory-step-change');
+
+      expect(step?.snapshotIdBefore).toBe('warm-before');
+      expect(step?.snapshotIdAfter).toBe('warm-after');
+      expect(step?.valueBefore).toBe(64 * MB);
+      expect(step?.valueAfter).toBe(192 * MB);
+      expect(step?.observations.join(' ')).not.toContain('from zero');
+    });
+
     it('reports a single-interval jump against the dataset counter', () => {
       const anomalies = detectMemoryAnomalies(series([64 * MB, 192 * MB]), options);
 
@@ -54,9 +138,7 @@ describe('detectMemoryAnomalies', () => {
     it('records a byte delta and cites the counter it measured', () => {
       const anomaly = detectMemoryAnomalies(series([64 * MB, 192 * MB]), options)[0];
 
-      expect(anomaly?.deltaBytes).toBe(
-        (anomaly?.valueAfter ?? 0) - (anomaly?.valueBefore ?? 0),
-      );
+      expect(anomaly?.deltaBytes).toBe((anomaly?.valueAfter ?? 0) - (anomaly?.valueBefore ?? 0));
       expect(anomaly?.observations.join(' ')).toContain('used_memory_dataset moved from');
       expect(anomaly?.observations.join(' ')).toContain('step rather than a trend');
     });
@@ -87,7 +169,9 @@ describe('detectMemoryAnomalies', () => {
       expect(anomalies[0]?.kind).toBe('memory-growth');
       expect(anomalies[0]?.snapshotIdBefore).toBe('snapshot-1');
       expect(anomalies[0]?.snapshotIdAfter).toBe('snapshot-4');
-      expect(anomalies[0]?.observations.join(' ')).toContain('rose in every one of the 3 intervals');
+      expect(anomalies[0]?.observations.join(' ')).toContain(
+        'rose in every one of the 3 intervals',
+      );
     });
 
     it('needs three snapshots, not two', () => {

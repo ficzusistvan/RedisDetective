@@ -4,7 +4,7 @@ export interface WatchTick {
   /** ISO-8601 UTC instant the sample was started. */
   readonly at: string;
   readonly sampledKeys: number;
-  readonly usedMemoryBytes: number;
+  readonly usedMemoryBytes: number | null;
   /** Snapshots in the store after this sample, including it. */
   readonly snapshotCount: number;
   /** The pattern this tick's diagnosis named, or `null` when it named none. */

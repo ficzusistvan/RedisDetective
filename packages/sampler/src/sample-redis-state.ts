@@ -1,4 +1,9 @@
-import type { RedisSnapshot, SamplingMetadata } from '@redis-detective/core-types';
+import type {
+  RedisKeyspaceFacts,
+  RedisMemoryFacts,
+  RedisSnapshot,
+  SamplingMetadata,
+} from '@redis-detective/core-types';
 
 import type { RedisCommandClient } from './redis-command-client.js';
 import type { SamplerOptions } from './sampler-options.js';
@@ -29,6 +34,31 @@ export const DEFAULT_SAMPLE_REDIS_STATE_DEPS: SampleRedisStateDeps = {
 /** Sections requested in one round trip. `everything` would add latency for data we do not use. */
 const INFO_SECTIONS = ['server', 'memory', 'stats', 'keyspace', 'replication'] as const;
 
+/**
+ * Says when the memory total cannot be read as "how much data is stored".
+ *
+ * A missing field is unknown. A zero beside a non-empty keyspace is resident RAM — a quiet
+ * multi-tier database can drop untouched data from memory and still report the keys — so recording
+ * it as an empty dataset would be a different claim from the one `INFO` made.
+ */
+function memoryReadingWarnings(
+  memory: RedisMemoryFacts,
+  keyspace: readonly RedisKeyspaceFacts[],
+): readonly string[] {
+  if (memory.usedMemoryBytes === null) {
+    return ['used_memory was absent from INFO, so this snapshot has no memory total.'];
+  }
+
+  const keyCount = keyspace.reduce((sum, entry) => sum + entry.keyCount, 0);
+  if (memory.usedMemoryBytes === 0 && keyCount > 0) {
+    return [
+      `used_memory is 0 bytes while the keyspace reports ${keyCount} keys. That is resident memory, not an empty dataset.`,
+    ];
+  }
+
+  return [];
+}
+
 async function readInfo(client: RedisCommandClient): Promise<string> {
   const sections: string[] = [];
   for (const section of INFO_SECTIONS) {
@@ -56,6 +86,8 @@ export async function sampleRedisState(
   const startedAt = deps.now();
 
   const fields = parseRedisInfo(await readInfo(client));
+  const memory = readMemoryFacts(fields);
+  const keyspace = parseKeyspaceFacts(fields);
 
   const sample = await scanKeySample(client, resolved, {
     now: () => deps.now().getTime(),
@@ -82,6 +114,7 @@ export async function sampleRedisState(
     warnings: [
       ...resolved.clamped.map((clamp) => `Requested sampling bound was reduced: ${clamp}.`),
       ...sample.warnings,
+      ...memoryReadingWarnings(memory, keyspace),
     ],
   };
 
@@ -89,8 +122,8 @@ export async function sampleRedisState(
     snapshotId: deps.newSnapshotId(),
     capturedAt: startedAt.toISOString(),
     instance: readInstanceIdentity(fields),
-    memory: readMemoryFacts(fields),
-    keyspace: parseKeyspaceFacts(fields),
+    memory,
+    keyspace,
     patterns,
     sampling,
   };

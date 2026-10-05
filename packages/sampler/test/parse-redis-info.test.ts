@@ -141,4 +141,21 @@ describe('readMemoryFacts', () => {
     expect(memory.usedMemoryRssBytes).toBe(2_048);
     expect(memory.memFragmentationRatio).toBe(1);
   });
+
+  // A missing field and a real zero mean different things once snapshots are diffed.
+  it('leaves a missing used_memory unknown rather than recording zero', () => {
+    const memory = readMemoryFacts(parseRedisInfo('used_memory_rss:10\r\n'));
+
+    expect(memory.usedMemoryBytes).toBeNull();
+    expect(memory.usedMemoryDatasetBytes).toBeNull();
+    expect(memory.usedMemoryPeakBytes).toBeNull();
+    expect(memory.usedMemoryRssBytes).toBe(10);
+  });
+
+  it('keeps an explicit zero', () => {
+    const memory = readMemoryFacts(parseRedisInfo('used_memory:0\r\n'));
+
+    expect(memory.usedMemoryBytes).toBe(0);
+    expect(memory.usedMemoryDatasetBytes).toBe(0);
+  });
 });

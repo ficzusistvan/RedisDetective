@@ -47,7 +47,8 @@ export function patternFixture(overrides: PatternFixtureOverrides = {}): KeyPatt
 export interface SnapshotFixtureOverrides {
   readonly snapshotId?: string;
   readonly capturedAt?: string;
-  readonly usedMemoryBytes?: number;
+  /** `null` means `used_memory` was absent. `0` is a real resident-memory reading. */
+  readonly usedMemoryBytes?: number | null;
   /** Total keys reported by `INFO keyspace`, which is measured rather than sampled. */
   readonly keyCount?: number;
   readonly patterns?: readonly KeyPatternStats[];
@@ -66,8 +67,14 @@ export interface SnapshotFixtureOverrides {
  * `selectGrowthMetric` reads exact equality across every snapshot as the sampler's fallback for a
  * server that does not report the dataset field.
  */
+function scaleBytes(bytes: number | null, factor: number): number | null {
+  return bytes === null ? null : Math.round(bytes * factor);
+}
+
 export function snapshotFixture(overrides: SnapshotFixtureOverrides = {}): RedisSnapshot {
-  const usedMemoryBytes = overrides.usedMemoryBytes ?? 64 * 1_024 * 1_024;
+  // `??` would treat an explicit 0 as missing and substitute the default.
+  const usedMemoryBytes =
+    overrides.usedMemoryBytes === undefined ? 64 * 1_024 * 1_024 : overrides.usedMemoryBytes;
 
   return {
     snapshotId: overrides.snapshotId ?? 'snapshot-1',
@@ -83,8 +90,8 @@ export function snapshotFixture(overrides: SnapshotFixtureOverrides = {}): Redis
     },
     memory: {
       usedMemoryBytes,
-      usedMemoryRssBytes: Math.round(usedMemoryBytes * 1.2),
-      usedMemoryDatasetBytes: Math.round(usedMemoryBytes * 0.9),
+      usedMemoryRssBytes: scaleBytes(usedMemoryBytes, 1.2),
+      usedMemoryDatasetBytes: scaleBytes(usedMemoryBytes, 0.9),
       usedMemoryPeakBytes: usedMemoryBytes,
       memFragmentationRatio: 1.2,
       evictedKeys: 0,

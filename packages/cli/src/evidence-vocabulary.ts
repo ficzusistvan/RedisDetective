@@ -109,6 +109,7 @@ export const EVIDENCE_VOCABULARY = {
     'insufficient-snapshots': 'Not enough snapshots',
     'sample-too-small': 'Sample too small',
     'snapshot-gap': 'Unobserved interval',
+    'memory-not-comparable': 'Memory reading left out of the comparison',
     'unattributed-growth': 'Growth with no established cause',
     'pattern-not-comparable': 'Patterns that could not be compared',
     'no-repository-connected': 'No repository connected',

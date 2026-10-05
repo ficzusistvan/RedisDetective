@@ -22,8 +22,9 @@ describe('formatBytes', () => {
     expect(formatBytes(1)).toBe('1 B');
   });
 
-  it('handles negative and non-finite input', () => {
+  it('handles negative, missing, and non-finite input', () => {
     expect(formatBytes(-2_048)).toBe('-2.0 KB');
+    expect(formatBytes(null)).toBe('unknown');
     expect(formatBytes(Number.NaN)).toBe('unknown');
   });
 });

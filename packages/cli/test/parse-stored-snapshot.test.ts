@@ -21,10 +21,26 @@ describe('parseStoredSnapshot', () => {
     expect(parseStoredSnapshot(stored(serializeSnapshot(snapshot)), location)).toEqual(snapshot);
   });
 
+  it('keeps a missing memory total as null', () => {
+    const snapshot = snapshotFixture({
+      memory: {
+        ...snapshotFixture().memory,
+        usedMemoryBytes: null,
+        usedMemoryRssBytes: null,
+        usedMemoryDatasetBytes: null,
+        usedMemoryPeakBytes: null,
+      },
+    });
+
+    expect(
+      parseStoredSnapshot(stored(serializeSnapshot(snapshot)), location).memory.usedMemoryBytes,
+    ).toBeNull();
+  });
+
   it('rejects a missing schema version rather than guessing', () => {
-    expect(() => parseStoredSnapshot({ snapshot: serializeSnapshot(snapshotFixture()) }, location)).toThrow(
-      StoredSnapshotError,
-    );
+    expect(() =>
+      parseStoredSnapshot({ snapshot: serializeSnapshot(snapshotFixture()) }, location),
+    ).toThrow(StoredSnapshotError);
   });
 
   it('rejects a different schema version', () => {

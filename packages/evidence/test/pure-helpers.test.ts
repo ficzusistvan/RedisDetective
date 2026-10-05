@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  comparableStoredBytes,
   describeChange,
   readGrowthMetric,
   relativeChange,
@@ -92,6 +93,24 @@ describe('selectGrowthMetric', () => {
     expect(readGrowthMetric(snapshot, 'used_memory_dataset')).toBe(
       snapshot.memory.usedMemoryDatasetBytes,
     );
+  });
+});
+
+describe('comparableStoredBytes', () => {
+  it('keeps a measured total, including growth from a genuinely empty instance', () => {
+    expect(comparableStoredBytes(snapshotFixture(), 'used_memory')).toBe(64 * 1_024 * 1_024);
+    expect(
+      comparableStoredBytes(snapshotFixture({ usedMemoryBytes: 0, keyCount: 0 }), 'used_memory'),
+    ).toBe(0);
+  });
+
+  it('drops a missing counter and a zero that still has keys', () => {
+    expect(
+      comparableStoredBytes(snapshotFixture({ usedMemoryBytes: null }), 'used_memory'),
+    ).toBeNull();
+    expect(
+      comparableStoredBytes(snapshotFixture({ usedMemoryBytes: 0, keyCount: 4 }), 'used_memory'),
+    ).toBeNull();
   });
 });
 

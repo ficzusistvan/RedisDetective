@@ -5,6 +5,11 @@ export const EVIDENCE_GAP_KINDS = [
   'sample-too-small',
   /** A long unobserved interval inside the window; the change could have happened anywhere in it. */
   'snapshot-gap',
+  /**
+   * A memory counter cannot be diffed as stored size. The field was missing, or it was 0 while the
+   * keyspace still held keys — resident RAM, not an empty dataset.
+   */
+  'memory-not-comparable',
   /** Growth is real but no single pattern accounts for a meaningful share of it. */
   'unattributed-growth',
   /**

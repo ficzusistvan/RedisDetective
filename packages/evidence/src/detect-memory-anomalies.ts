@@ -10,7 +10,7 @@ import type { GrowthMetric } from './select-growth-metric.js';
 import { createEvidenceId } from './create-evidence-id.js';
 import { describeChange } from './describe-change.js';
 import { gradeEvidenceStrength } from './grade-evidence-strength.js';
-import { readGrowthMetric, selectGrowthMetric } from './select-growth-metric.js';
+import { comparableStoredBytes, selectGrowthMetric } from './select-growth-metric.js';
 import { relativeChange } from './relative-change.js';
 import { totalKeyCount } from './total-key-count.js';
 
@@ -111,8 +111,12 @@ function detectStepChange(
   metric: GrowthMetric,
   options: ResolvedEvidenceOptions,
 ): AnomalyEvent | null {
-  const valueBefore = readGrowthMetric(interval.before, metric);
-  const valueAfter = readGrowthMetric(interval.after, metric);
+  const valueBefore = comparableStoredBytes(interval.before, metric);
+  const valueAfter = comparableStoredBytes(interval.after, metric);
+  // A missing counter, or a resident 0 beside a non-empty keyspace, is not stored size.
+  if (valueBefore === null || valueAfter === null) {
+    return null;
+  }
   const delta = valueAfter - valueBefore;
 
   // Both thresholds, not either. A 25% jump on a 4 MB instance is noise; 8 MB spread over a week is
@@ -139,8 +143,7 @@ function detectStepChange(
       supportingSnapshotCount: 2,
       // A jump in bytes matched by a jump in keys is a write path producing more data, rather than
       // a transient buffer or a background save inflating one reading.
-      hasCorroboratingSignal:
-        relativeChange(keysBefore, keysAfter) >= options.minGrowthRatio,
+      hasCorroboratingSignal: relativeChange(keysBefore, keysAfter) >= options.minGrowthRatio,
       observations: [
         describeChange(metric, valueBefore, valueAfter, 'bytes'),
         describeChange('key count', keysBefore, keysAfter, 'keys'),
@@ -165,10 +168,13 @@ function detectKeyCountGrowth(
   const keysBefore = totalKeyCount(first);
   const keysAfter = totalKeyCount(last);
   const keyGrowth = relativeChange(keysBefore, keysAfter);
-  const memoryGrowth = relativeChange(
-    readGrowthMetric(first, metric),
-    readGrowthMetric(last, metric),
-  );
+  const memoryBefore = comparableStoredBytes(first, metric);
+  const memoryAfter = comparableStoredBytes(last, metric);
+  // "Faster than memory" needs a stored-size reading at both ends. A resident zero is not one.
+  if (memoryBefore === null || memoryAfter === null) {
+    return null;
+  }
+  const memoryGrowth = relativeChange(memoryBefore, memoryAfter);
 
   // Keys outpacing bytes means the instance is accumulating entries rather than fattening existing
   // ones — the shape a leak of small keys makes, and a different fix from a value that grew.
@@ -210,10 +216,13 @@ function detectFragmentationGrowth(
 
   const ratioBefore = first.memory.memFragmentationRatio;
   const ratioAfter = last.memory.memFragmentationRatio;
-  const datasetGrowth = relativeChange(
-    readGrowthMetric(first, metric),
-    readGrowthMetric(last, metric),
-  );
+  const storedBefore = comparableStoredBytes(first, metric);
+  const storedAfter = comparableStoredBytes(last, metric);
+  // "Stored data was flat" is only sayable when both ends have a stored-size reading.
+  if (storedBefore === null || storedAfter === null) {
+    return null;
+  }
+  const datasetGrowth = relativeChange(storedBefore, storedAfter);
 
   // Only interesting while the data itself is flat. Fragmentation rising alongside real growth is
   // ordinary allocator behaviour and would distract from the actual cause.
@@ -226,6 +235,10 @@ function detectFragmentationGrowth(
 
   const rssBefore = first.memory.usedMemoryRssBytes;
   const rssAfter = last.memory.usedMemoryRssBytes;
+  const rssObservations =
+    rssBefore === null || rssAfter === null
+      ? []
+      : [describeChange('used_memory_rss', rssBefore, rssAfter, 'bytes')];
 
   return finalize(
     {
@@ -238,10 +251,13 @@ function detectFragmentationGrowth(
       // A ratio, not a byte count.
       deltaBytes: null,
       supportingSnapshotCount: run.length,
-      hasCorroboratingSignal: relativeChange(rssBefore, rssAfter) >= options.minGrowthRatio,
+      hasCorroboratingSignal:
+        rssBefore !== null &&
+        rssAfter !== null &&
+        relativeChange(rssBefore, rssAfter) >= options.minGrowthRatio,
       observations: [
         describeChange('mem_fragmentation_ratio', ratioBefore, ratioAfter, 'ratio'),
-        describeChange('used_memory_rss', rssBefore, rssAfter, 'bytes'),
+        ...rssObservations,
         `Stored data was flat across this window (${metric} changed by less than the ${options.minGrowthRatio} growth threshold), so the additional footprint is allocator overhead rather than new data.`,
       ],
     },
@@ -273,13 +289,16 @@ function detectEvictionOnset(interval: Interval): AnomalyEvent | null {
       // A key count, not bytes.
       deltaBytes: null,
       supportingSnapshotCount: 2,
-      hasCorroboratingSignal: maxmemoryBytes !== null && used >= maxmemoryBytes * 0.9,
+      hasCorroboratingSignal:
+        maxmemoryBytes !== null && used !== null && used >= maxmemoryBytes * 0.9,
       observations: [
         describeChange('evicted_keys', before, after, 'keys'),
         `Evictions began under the ${maxmemoryPolicy} policy, so the instance reached its ceiling during this interval and is discarding data.`,
-        maxmemoryBytes === null
-          ? 'No maxmemory is configured on this instance, so the ceiling is the host.'
-          : `used_memory was ${used} bytes against a maxmemory of ${maxmemoryBytes} bytes.`,
+        used === null
+          ? 'used_memory was not reported, so it cannot be compared with maxmemory.'
+          : maxmemoryBytes === null
+            ? 'No maxmemory is configured on this instance, so the ceiling is the host.'
+            : `used_memory was ${used} bytes against a maxmemory of ${maxmemoryBytes} bytes.`,
       ],
     },
     [interval.before, interval.after],
@@ -313,7 +332,9 @@ function risingRuns(
   };
 
   for (const interval of intervals) {
-    if (valueOf(interval.after) <= valueOf(interval.before)) {
+    // Non-finite readings are not a rise. `<=` would treat NaN as a rise because every comparison
+    // with NaN is false.
+    if (!(valueOf(interval.after) > valueOf(interval.before))) {
       flush();
       continue;
     }
@@ -345,8 +366,11 @@ function detectSustainedGrowth(
     return null;
   }
 
-  const valueBefore = readGrowthMetric(first, metric);
-  const valueAfter = readGrowthMetric(last, metric);
+  const valueBefore = comparableStoredBytes(first, metric);
+  const valueAfter = comparableStoredBytes(last, metric);
+  if (valueBefore === null || valueAfter === null) {
+    return null;
+  }
   const delta = valueAfter - valueBefore;
 
   // Both thresholds again: a relative rise keeps large instances from flagging routine churn, and an
@@ -408,18 +432,27 @@ export function detectMemoryAnomalies(
 
   const metric = selectGrowthMetric(snapshots);
   const intervals = comparableIntervals(snapshots, options);
+  // Resident zeros and missing counters stay on the snapshot, but they are not stored-size points,
+  // so memory trends are built from the readings that still describe how much data is stored.
+  const memoryIntervals = comparableIntervals(
+    snapshots.filter((snapshot) => comparableStoredBytes(snapshot, metric) !== null),
+    options,
+  );
   const anomalies: AnomalyEvent[] = [];
   const stepChangeIndexes = new Set<number>();
 
-  // Interval-shaped findings. A step change and the onset of eviction are both events that happen
-  // *within* one interval, so per-interval is the right granularity for them.
-  for (const interval of intervals) {
+  // A step change is a stored-size event, so it is taken from the readings that still describe how
+  // much data is stored. Eviction onset stays on the full list: a resident-zero sample can still
+  // be the moment evictions start.
+  for (const interval of memoryIntervals) {
     const stepChange = detectStepChange(interval, metric, options);
     if (stepChange !== null) {
       anomalies.push(stepChange);
       stepChangeIndexes.add(interval.index);
     }
+  }
 
+  for (const interval of intervals) {
     const evictionOnset = detectEvictionOnset(interval);
     if (evictionOnset !== null) {
       anomalies.push(evictionOnset);
@@ -428,10 +461,12 @@ export function detectMemoryAnomalies(
 
   // Span-shaped findings, each reported once over the longest window in which it holds.
   // A span containing a step change is already reported as that step change.
-  const trendIntervals = intervals.filter((interval) => !stepChangeIndexes.has(interval.index));
+  const trendIntervals = memoryIntervals.filter(
+    (interval) => !stepChangeIndexes.has(interval.index),
+  );
   for (const run of risingRuns(
     trendIntervals,
-    (snapshot) => readGrowthMetric(snapshot, metric),
+    (snapshot) => comparableStoredBytes(snapshot, metric) ?? Number.NaN,
     MIN_RUN_FOR_TREND,
   )) {
     const sustained = detectSustainedGrowth(run, metric, options);
@@ -447,11 +482,7 @@ export function detectMemoryAnomalies(
     }
   }
 
-  for (const run of risingRuns(
-    intervals,
-    (snapshot) => snapshot.memory.memFragmentationRatio,
-    2,
-  )) {
+  for (const run of risingRuns(intervals, (snapshot) => snapshot.memory.memFragmentationRatio, 2)) {
     const fragmentation = detectFragmentationGrowth(run, metric, options);
     if (fragmentation !== null) {
       anomalies.push(fragmentation);

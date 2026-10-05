@@ -183,11 +183,7 @@ export function parseStoredSnapshot(contents: unknown, location: string): RedisS
     capturedAt: timestamp(raw['capturedAt'], `${path}.capturedAt`),
     instance: {
       redisVersion: text(instance['redisVersion'], `${path}.instance.redisVersion`),
-      mode: oneOf<RedisDeploymentMode>(
-        instance['mode'],
-        `${path}.instance.mode`,
-        DEPLOYMENT_MODES,
-      ),
+      mode: oneOf<RedisDeploymentMode>(instance['mode'], `${path}.instance.mode`, DEPLOYMENT_MODES),
       role: oneOf<RedisRole>(instance['role'], `${path}.instance.role`, ROLES),
       maxmemoryBytes: nullableFiniteNumber(
         instance['maxmemoryBytes'],
@@ -197,16 +193,19 @@ export function parseStoredSnapshot(contents: unknown, location: string): RedisS
       uptimeSeconds: finiteNumber(instance['uptimeSeconds'], `${path}.instance.uptimeSeconds`),
     },
     memory: {
-      usedMemoryBytes: finiteNumber(memory['usedMemoryBytes'], `${path}.memory.usedMemoryBytes`),
-      usedMemoryRssBytes: finiteNumber(
+      usedMemoryBytes: nullableFiniteNumber(
+        memory['usedMemoryBytes'],
+        `${path}.memory.usedMemoryBytes`,
+      ),
+      usedMemoryRssBytes: nullableFiniteNumber(
         memory['usedMemoryRssBytes'],
         `${path}.memory.usedMemoryRssBytes`,
       ),
-      usedMemoryDatasetBytes: finiteNumber(
+      usedMemoryDatasetBytes: nullableFiniteNumber(
         memory['usedMemoryDatasetBytes'],
         `${path}.memory.usedMemoryDatasetBytes`,
       ),
-      usedMemoryPeakBytes: finiteNumber(
+      usedMemoryPeakBytes: nullableFiniteNumber(
         memory['usedMemoryPeakBytes'],
         `${path}.memory.usedMemoryPeakBytes`,
       ),

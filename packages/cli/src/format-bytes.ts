@@ -6,8 +6,8 @@ const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const;
  * Kept in one place so that no code path can print a raw byte count in one column and a formatted
  * one in another, which makes a report look inconsistent about its own precision.
  */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes)) {
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes)) {
     return 'unknown';
   }
 

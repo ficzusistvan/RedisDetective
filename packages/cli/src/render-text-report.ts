@@ -73,6 +73,11 @@ function renderInstanceSection(report: HealthCheckReport): string {
 
   if (instance.maxmemoryBytes === null) {
     rows.push(['Limit', `none configured (policy ${instance.maxmemoryPolicy})`]);
+  } else if (memory.usedMemoryBytes === null) {
+    rows.push([
+      'Limit',
+      `${formatBytes(instance.maxmemoryBytes)} — used memory was not reported (policy ${instance.maxmemoryPolicy})`,
+    ]);
   } else {
     const share = memory.usedMemoryBytes / instance.maxmemoryBytes;
     rows.push([

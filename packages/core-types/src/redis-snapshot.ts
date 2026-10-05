@@ -14,12 +14,18 @@ export interface RedisInstanceIdentity {
   readonly uptimeSeconds: number;
 }
 
-/** Straight from `INFO memory` / `INFO stats`. Measured, not sampled. */
+/**
+ * Straight from `INFO memory` / `INFO stats`. Measured, not sampled.
+ *
+ * A byte counter is `null` when that field was absent from `INFO`. A present `0` stays `0`: it is
+ * a real reading of resident allocator memory, and collapsing the two would make a later sample
+ * unable to tell "the field was missing" from "nothing is in RAM".
+ */
 export interface RedisMemoryFacts {
-  readonly usedMemoryBytes: number;
-  readonly usedMemoryRssBytes: number;
-  readonly usedMemoryDatasetBytes: number;
-  readonly usedMemoryPeakBytes: number;
+  readonly usedMemoryBytes: number | null;
+  readonly usedMemoryRssBytes: number | null;
+  readonly usedMemoryDatasetBytes: number | null;
+  readonly usedMemoryPeakBytes: number | null;
   readonly memFragmentationRatio: number;
   readonly evictedKeys: number;
   readonly expiredKeys: number;

@@ -84,10 +84,7 @@ function primaryAttribution(graph: EvidenceGraph): PatternAttribution | null {
   return ranked[0] ?? null;
 }
 
-function matchingDrift(
-  graph: EvidenceGraph,
-  pattern: string,
-): readonly TTLDriftEvent[] {
+function matchingDrift(graph: EvidenceGraph, pattern: string): readonly TTLDriftEvent[] {
   return graph.ttlDrift.filter((event) => event.pattern === pattern);
 }
 
@@ -232,7 +229,12 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
     generatedAt: input.generatedAt,
     graphId: graph.graphId,
     headline: causeHeadline(attribution, driftEvents),
-    summary: causeSummary(graph, attribution, anomaly?.deltaBytes ?? attribution.bytesGrowth, commits),
+    summary: causeSummary(
+      graph,
+      attribution,
+      anomaly?.deltaBytes ?? attribution.bytesGrowth,
+      commits,
+    ),
     likelyCause,
     hintedCandidateShas: commits.map((commit) => commit.sha),
     supportingEvidence: [...causeCitations, ...commitCitations],
@@ -250,6 +252,9 @@ function headlineWithoutCause(graph: EvidenceGraph): string {
   }
   if (kinds.has('no-growth-detected')) {
     return 'No memory growth was found in this window.';
+  }
+  if (kinds.has('memory-not-comparable')) {
+    return 'Memory could not be compared as stored size for every snapshot.';
   }
   if (kinds.has('unattributed-growth')) {
     return 'Memory grew, but no pattern accounts for enough of it to name a cause.';

@@ -1,3 +1,7 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -153,6 +157,13 @@ describe('main', () => {
       expect(help).toContain('memory growth');
       expect(help).toContain('.env');
       expect(help).toContain('LLM_API_KEY');
+      expect(help).toContain('--format');
+      expect(help).toContain('markdown');
+      expect(help).toContain('--write-json');
+      expect(help).toContain('--fail-on-ttl-drop');
+      expect(help).toContain('--fail-on-growth-percent');
+      expect(help).toContain('--warn-only');
+      expect(help).toContain('Exit 7');
     });
 
     it('prints the version', async () => {
@@ -267,9 +278,108 @@ describe('main', () => {
       });
 
       expect(result.exitCode).toBe(EXIT_CODES.ok);
-      const parsed = JSON.parse(result.out) as { reportType: string };
+      const parsed = JSON.parse(result.out) as { reportType: string; gate?: unknown };
       expect(parsed.reportType).toBe('diagnosis');
+      expect(parsed.gate).toBeUndefined();
       expect(result.err).toBe('');
+    });
+
+    it('writes Markdown on --format markdown and never prints example keys', async () => {
+      const result = await run(['--snapshots', './snaps', '--format', 'markdown'], {
+        openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+      });
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.out).toContain('# Redis Memory Diagnosis');
+      expect(result.out).toContain('cart:items:*');
+      expect(result.out).not.toMatch(/cart:items:[0-9a-f]{4}/);
+    });
+
+    it('exits 7 when a TTL-drop gate is crossed', async () => {
+      const result = await run(
+        ['--snapshots', './snaps', '--format', 'markdown', '--fail-on-ttl-drop', '20'],
+        {
+          openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.thresholdExceeded);
+      expect(result.out).toContain('## Gate');
+      expect(result.out).toContain('**Outcome:** fail');
+      expect(result.out).toContain('cart:items:*');
+    });
+
+    it('exits 0 under --warn-only even when a gate is crossed', async () => {
+      const result = await run(
+        ['--snapshots', './snaps', '--fail-on-ttl-drop', '20', '--warn-only'],
+        {
+          openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.out).toContain('Gate');
+      expect(result.out).toContain('warn-only');
+    });
+
+    it('rejects gate flags without --snapshots', async () => {
+      const result = await run(['--url', 'redis://localhost:6379', '--fail-on-ttl-drop', '20']);
+
+      expect(result.exitCode).toBe(EXIT_CODES.usageError);
+      expect(result.err).toContain('--snapshots');
+    });
+
+    it('writes JSON to --write-json while keeping Markdown on stdout', async () => {
+      const dir = await mkdtemp(join(tmpdir(), 'redis-detective-gate-'));
+      const jsonPath = join(dir, 'report.json');
+      try {
+        const result = await run(
+          [
+            '--snapshots',
+            './snaps',
+            '--format',
+            'markdown',
+            '--write-json',
+            jsonPath,
+            '--fail-on-ttl-drop',
+            '20',
+          ],
+          {
+            openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+          },
+        );
+
+        expect(result.exitCode).toBe(EXIT_CODES.thresholdExceeded);
+        expect(result.out.startsWith('# Redis Memory Diagnosis')).toBe(true);
+        const parsed = JSON.parse(await readFile(jsonPath, 'utf8')) as {
+          reportType: string;
+          gate: { outcome: string; findings: readonly { pattern: string }[] };
+        };
+        expect(parsed.reportType).toBe('diagnosis');
+        expect(parsed.gate.outcome).toBe('fail');
+        expect(parsed.gate.findings[0]?.pattern).toBe('cart:items:*');
+      } finally {
+        await rm(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('does not print Redis credentials in Markdown diagnosis output', async () => {
+      const result = await run(
+        [
+          '--url',
+          'redis://user:sup3rs3cret@localhost:6379',
+          '--snapshots',
+          './snaps',
+          '--format',
+          'markdown',
+        ],
+        {
+          openSnapshotStore: () => createMemorySnapshotStore(leakingSnapshots()),
+        },
+      );
+
+      expect(`${result.out}${result.err}`).not.toContain('sup3rs3cret');
+      expect(result.out).toContain('redis://user:***@localhost:6379');
     });
 
     it('reports an unreadable snapshot file with a dedicated exit code', async () => {

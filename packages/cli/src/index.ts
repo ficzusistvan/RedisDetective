@@ -4,6 +4,9 @@ export { readCliVersion } from './read-cli-version.js';
 export { EXIT_CODES } from './exit-codes.js';
 export type { ExitCode } from './exit-codes.js';
 
+export { CLI_OUTPUT_FORMATS, isCliOutputFormat } from './output-format.js';
+export type { CliOutputFormat } from './output-format.js';
+
 export { CliUsageError, parseCliArgs } from './parse-cli-args.js';
 export type { CliOptions } from './parse-cli-args.js';
 
@@ -15,6 +18,7 @@ export type { LoadDotenvRequest } from './load-dotenv.js';
 
 export { redactRedisUrl } from './redact-redis-url.js';
 export { REDACTED_KEY, redactExampleKeys } from './redact-example-keys.js';
+export { omitExampleKeySentence } from './omit-example-keys.js';
 
 export {
   formatBytes,
@@ -41,7 +45,10 @@ export { patternHintsFromGraph } from './pattern-hints-from-graph.js';
 export { withNoRepositoryGap } from './with-no-repository-gap.js';
 export { withGitHubUnavailableGap } from './with-github-unavailable-gap.js';
 export { shouldNudgeRepositoryConnection } from './should-nudge-repository-connection.js';
-export { createGitHubCommitSource, resolvePersonalGitHubToken } from './create-github-commit-source.js';
+export {
+  createGitHubCommitSource,
+  resolvePersonalGitHubToken,
+} from './create-github-commit-source.js';
 export type {
   CreateGitHubCommitSourceRequest,
   ReadGhAuthToken,
@@ -91,13 +98,40 @@ export { formatWatchTick } from './format-watch-tick.js';
 export type { WatchTick } from './format-watch-tick.js';
 
 export { renderTextReport } from './render-text-report.js';
+export { renderMarkdownReport } from './render-markdown-report.js';
 export { JSON_REPORT_SCHEMA_VERSION, renderJsonReport } from './render-json-report.js';
 export { renderTextDiagnosis } from './render-text-diagnosis.js';
+export { renderMarkdownDiagnosis, renderGateMarkdown } from './render-markdown-diagnosis.js';
 export {
   DIAGNOSIS_REPORT_SCHEMA_VERSION,
   DIAGNOSIS_REPORT_TYPE,
   renderJsonDiagnosis,
 } from './render-json-diagnosis.js';
+
+export {
+  CI_GATE_FINDING_KINDS,
+  CI_GATE_MIN_SAMPLED_KEYS,
+  CI_GATE_NEAR_ZERO_TTL_COVERAGE,
+  CI_GATE_OUTCOMES,
+  emptyCiGateThresholds,
+  evaluateCiGate,
+  hasCiGateThresholds,
+} from './evaluate-ci-gate.js';
+export type {
+  CiGateFinding,
+  CiGateFindingKind,
+  CiGateOutcome,
+  CiGateResult,
+  CiGateThresholds,
+  EvaluateCiGateRequest,
+} from './evaluate-ci-gate.js';
+export { serializeCiGate } from './serialize-ci-gate.js';
+export {
+  formatCiGateFindingDetail,
+  formatCiGateFindingRule,
+  formatCiGateOutcome,
+  formatCiGateOutcomeValue,
+} from './format-ci-gate-finding.js';
 
 export { main } from './main.js';
 export type {

@@ -1,4 +1,6 @@
 import type { DiagnosisReport } from './diagnosis-report.js';
+import type { CiGateResult } from './evaluate-ci-gate.js';
+import { serializeCiGate } from './serialize-ci-gate.js';
 import { serializeSnapshot } from './serialize-snapshot.js';
 
 /** Bump on any breaking change to the JSON shape; consumers key off this. */
@@ -14,7 +16,10 @@ export const DIAGNOSIS_REPORT_TYPE = 'diagnosis';
  * the tool reasoned about. Every object is rebuilt field by field rather than spread, so a new
  * internal field cannot leak into the public contract.
  */
-export function renderJsonDiagnosis(report: DiagnosisReport): string {
+export function renderJsonDiagnosis(
+  report: DiagnosisReport,
+  gate: CiGateResult | null = null,
+): string {
   const { graph } = report;
 
   return `${JSON.stringify(
@@ -139,6 +144,7 @@ export function renderJsonDiagnosis(report: DiagnosisReport): string {
           remedy: gap.remedy,
         })),
       },
+      ...(gate === null ? {} : { gate: serializeCiGate(gate) }),
     },
     null,
     2,

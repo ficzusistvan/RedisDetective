@@ -154,6 +154,98 @@ diagnosis if you omit `--repo` **and** a credential signal is present (`GITHUB_A
 `GITHUB_TOKEN` / `GH_TOKEN`). Alone it does not turn on GitHub lookup. Default
 `GITHUB_TOKEN` often needs `contents: read` (and pull-requests read) on the job.
 
+## GitHub Action (CI gate)
+
+A reusable composite action at the repo root (`action.yml`) runs the same diagnosis
+against a Redis URL, compares it to a **baseline snapshot**, writes Markdown to
+`$GITHUB_STEP_SUMMARY`, optionally updates a **single sticky PR comment**, and
+fails the job when a threshold is crossed.
+
+Every derived figure is still an estimate. The gate is a threshold on observed
+change (bytes, percent, TTL coverage points) — not a confidence score.
+
+### Baseline
+
+Pick the most practical of these; they all land in `--snapshots`:
+
+1. **Same job, two ticks** — run the action twice on the same `snapshots-dir`.
+   The first run stores a baseline (`gate` outcome `skipped`). The second samples
+   again and compares.
+2. **File in the repo** — pass `baseline-path` to a committed
+   `*.snapshot.json` file or a directory of them.
+3. **Artifact from a previous run** — download the snapshots directory into
+   `baseline-path` before the compare step.
+
+The action copies `baseline-path` into `snapshots-dir`, then samples (if
+`redis-url` / `$REDIS_URL` is set) and diagnoses. Offline compare works the same
+way as the CLI: omit the URL and keep the files.
+
+### Inputs and outputs
+
+| Input                                                   | Default                      | Meaning                                                                                                                                                                                              |
+| ------------------------------------------------------- | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `redis-url`                                             | `$REDIS_URL`                 | Connection URL. Never printed. Prefer a replica or a read-only ACL user.                                                                                                                             |
+| `snapshots-dir`                                         | `.redis-detective/snapshots` | Where snapshots are stored for this job.                                                                                                                                                             |
+| `baseline-path`                                         | _(empty)_                    | Snapshot file or directory copied in before sampling.                                                                                                                                                |
+| `sample-size`, `timeout`, `memory-samples`, `databases` | CLI defaults                 | Sampling flags. Still clamped to the safe ceilings.                                                                                                                                                  |
+| `redact-keys`                                           | `true`                       | Example key names are replaced. Pattern names (`session:*`) stay.                                                                                                                                    |
+| `growth-percent`                                        | `25`                         | Pattern estimated-byte growth, percent. Set `off` to disable.                                                                                                                                        |
+| `growth-bytes`                                          | `10485760` (10 MiB)          | Pattern estimated-byte growth, bytes. Set `off` to disable. Combined with `growth-percent`: **both** must trip (a 2 KB pattern doubling is not an incident). Either flag alone trips on that number. |
+| `ttl-drop-points`                                       | `20`                         | TTL coverage drop in percentage points. Set `off` to disable.                                                                                                                                        |
+| `new-untimed-patterns`                                  | `true`                       | Fail when a pattern first appears with effectively no TTL.                                                                                                                                           |
+| `fail-on`                                               | `fail`                       | `fail` exits 7 when a rule trips; `warn-only` reports and exits 0.                                                                                                                                   |
+| `comment`                                               | `true`                       | Update one sticky PR comment (`<!-- redis-detective-sticky -->`) on `pull_request` when a token is present.                                                                                          |
+| `github-token`                                          | `${{ github.token }}`        | Used only for that comment. Needs `pull-requests: write`.                                                                                                                                            |
+| `cli-command`                                           | `npx --yes redis-detective`  | Override the binary. This repo uses `node packages/cli/dist/bin.js` after `pnpm build`.                                                                                                              |
+| `working-directory`                                     | `.`                          | Directory to run from.                                                                                                                                                                               |
+
+| Output           | Meaning                                       |
+| ---------------- | --------------------------------------------- |
+| `outcome`        | `pass`, `fail`, `warn`, `skipped`, or `error` |
+| `findings-count` | How many threshold findings were recorded     |
+| `markdown-path`  | Job-local Markdown report                     |
+| `json-path`      | Job-local JSON report (includes `gate`)       |
+
+The CLI flags behind this (`--format markdown`, `--write-json`, `--fail-on-*`,
+`--warn-only`) are also usable from a script. Exit **7** means a threshold was
+crossed. Markdown never prints example keys; Redis passwords are stripped from
+the target URL.
+
+Cluster / Sentinel: the tool samples **one URL** (one node). It does not walk
+slots or follow failovers. Point `redis-url` at a single node.
+
+Copy-paste workflow with a Redis service container:
+[`examples/github-action/workflow.yml`](examples/github-action/workflow.yml).
+
+```yaml
+- uses: ficzusistvan/RedisDetective@main
+  with:
+    redis-url: ${{ secrets.REDIS_URL }}
+    snapshots-dir: .redis-detective/snapshots
+    baseline-path: .redis-detective/baseline
+```
+
+## TTL drift demo
+
+<!-- demo-gif: short terminal capture of examples/ttl-drift-demo/run-demo.sh -->
+
+**GIF placeholder.** A 20–30s recording of the demo belongs here once captured
+(see [`examples/ttl-drift-demo/README.md`](examples/ttl-drift-demo/README.md)
+for a VHS / asciinema command).
+
+A "good" write path sets `EX` on `session:*`. A "buggy" version drops that
+argument — the silent leak this tool exists to name.
+
+```bash
+./examples/ttl-drift-demo/run-demo.sh
+```
+
+That script seeds Redis (Docker Compose on port 6380, or `$REDIS_URL`),
+snapshots, applies the bug, snapshots again, and prints a Markdown diagnosis
+that names `session:*`. It is **supposed to exit 7**. `.github/workflows/ttl-drift-demo.yml`
+runs the same scenario through the Action on every PR: the good path must pass
+the gate, the buggy path must fail it.
+
 ## Safety
 
 The tool issues only `INFO`, `SELECT`, `DBSIZE`, bounded `SCAN`, and `TYPE` / `PTTL` /

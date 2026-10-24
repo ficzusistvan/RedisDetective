@@ -12,6 +12,8 @@ export const EXIT_CODES = {
   snapshotError: 5,
   /** GitHub App auth or the commit API failed when --repo was requested. */
   githubError: 6,
+  /** A configured CI gate threshold was crossed (unless --warn-only). */
+  thresholdExceeded: 7,
 } as const;
 
 export type ExitCode = (typeof EXIT_CODES)[keyof typeof EXIT_CODES];

@@ -8,8 +8,15 @@ export interface TransitionAlertStateRequest {
   readonly occurredAt: string;
   readonly template: Omit<
     AlertStateRecord,
-    'status' | 'firstFiredAt' | 'lastNotifiedAt' | 'lastResolvedAt' | 'notifiedChannels'
-  >;
+    | 'status'
+    | 'firstFiredAt'
+    | 'lastNotifiedAt'
+    | 'lastResolvedAt'
+    | 'notifiedChannels'
+    | 'lastFinding'
+  > & {
+    readonly lastFinding?: AlertStateRecord['lastFinding'];
+  };
 }
 
 export interface AlertStateDecision {
@@ -39,6 +46,7 @@ export function transitionAlertState(request: TransitionAlertStateRequest): Aler
           lastNotifiedAt: occurredAt,
           lastResolvedAt: previous?.lastResolvedAt ?? null,
           notifiedChannels: [],
+          lastFinding: template.lastFinding ?? previous?.lastFinding ?? null,
         },
       };
     }
@@ -56,6 +64,7 @@ export function transitionAlertState(request: TransitionAlertStateRequest): Aler
         ...template,
         status: 'firing',
         lastNotifiedAt: occurredAt,
+        lastFinding: template.lastFinding ?? previous.lastFinding,
       },
     };
   }

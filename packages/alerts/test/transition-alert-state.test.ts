@@ -23,6 +23,7 @@ function firingRecord(at = '2026-10-25T12:00:00.000Z'): AlertStateRecord {
     lastNotifiedAt: at,
     lastResolvedAt: null,
     notifiedChannels: ['slack'],
+    lastFinding: null,
   };
 }
 

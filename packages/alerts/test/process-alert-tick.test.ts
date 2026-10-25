@@ -13,7 +13,9 @@ function recordingNotifier(): { notifier: Notifier; actions: string[] } {
   const notifier: Notifier = {
     channel: 'webhook',
     notify: (event) => {
-      actions.push(`${event.action}:${event.finding.pattern}`);
+      const detail =
+        event.finding.kind === 'ttl-coverage-drop' ? String(event.finding.dropPoints) : '';
+      actions.push(`${event.action}:${event.finding.pattern}:${detail}`);
       const result: NotifierResult = {
         channel: 'webhook',
         ok: true,
@@ -71,7 +73,7 @@ describe('processAlertTick', () => {
       writeLine: (line) => lines.push(line),
     });
 
-    expect(actions).toEqual(['firing:session:*', 'resolved:session:*']);
+    expect(actions).toEqual(['firing:session:*:92', 'resolved:session:*:92']);
     expect(lines.some((line) => line.includes('alert firing'))).toBe(true);
     expect(lines.some((line) => line.includes('alert suppressed'))).toBe(true);
     expect(lines.some((line) => line.includes('alert resolved'))).toBe(true);
@@ -108,7 +110,7 @@ describe('processAlertTick', () => {
       writeLine: () => undefined,
     });
 
-    expect(actions).toEqual(['firing:session:*']);
+    expect(actions).toEqual(['firing:session:*:92']);
     expect(afterRestart).toEqual([]);
   });
 

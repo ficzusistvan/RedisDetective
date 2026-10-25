@@ -141,7 +141,9 @@ Each (host, pattern, rule, finding kind) is an incident:
 
 State is a small JSON file (`<snapshots>/.redis-detective-alerts.json`, or
 `--alert-state-file`). A restart inside the cooldown does not re-page. A
-corrupt file is treated as empty and logged; `watch` keeps sampling.
+corrupt file is treated as empty and logged; `watch` keeps sampling. The last
+finding is stored so a resolve event can quote the numbers that tripped, not
+zeros.
 
 ## Failures
 

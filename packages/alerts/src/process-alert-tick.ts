@@ -74,6 +74,7 @@ export async function processAlertTick(
           pattern: finding.pattern,
           ruleId: evaluated.rule.id,
           kind: finding.kind,
+          lastFinding: finding,
         },
       });
 
@@ -108,7 +109,7 @@ export async function processAlertTick(
     if (record.status !== 'firing' || seen.has(record.fingerprint)) {
       continue;
     }
-    const finding = syntheticFindingFromRecord(record);
+    const finding = record.lastFinding ?? syntheticFindingFromRecord(record);
     const rule = request.rules.find((entry) => entry.rule.id === record.ruleId)?.rule;
     if (rule === undefined || finding === null) {
       nextRecords.set(record.fingerprint, {

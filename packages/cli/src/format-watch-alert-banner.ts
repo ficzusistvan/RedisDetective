@@ -3,7 +3,10 @@ import type { ResolvedAlertConfig } from '@redis-detective/alerts';
 
 import { formatDuration } from './format-bytes.js';
 
-export function formatWatchAlertBanner(config: ResolvedAlertConfig): readonly string[] {
+export function formatWatchAlertBanner(
+  config: ResolvedAlertConfig,
+  configPath: string | null = null,
+): readonly string[] {
   const channels = configuredChannels(config.channels);
   if (channels.length === 0 && config.rules.length === 0) {
     return [];
@@ -28,6 +31,9 @@ export function formatWatchAlertBanner(config: ResolvedAlertConfig): readonly st
   lines.push(
     `Alerts: ${channelList}. ${String(config.rules.length)} rule(s). Cooldown ${cooldown}.${config.dryRun ? ' Dry-run: payloads print instead of sending.' : ''}`,
   );
+  if (configPath !== null) {
+    lines.push(`Alert config: ${configPath}`);
+  }
   if (config.stateFile !== null) {
     lines.push(`Alert state: ${config.stateFile}`);
   }

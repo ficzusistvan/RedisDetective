@@ -5,7 +5,7 @@ import { ALERT_STATE_SCHEMA_VERSION } from './alert-defaults.js';
 import type { AlertChannel } from './alert-channel.js';
 import { isAlertChannel } from './alert-channel.js';
 import { ALERT_FINDING_KINDS } from './alert-finding.js';
-import type { AlertFindingKind } from './alert-finding.js';
+import type { AlertFinding, AlertFindingKind } from './alert-finding.js';
 import { ALERT_STATUSES } from './alert-state-record.js';
 import type { AlertStateRecord } from './alert-state-record.js';
 import type { AlertStateStore } from './alert-state-store.js';
@@ -110,7 +110,69 @@ function parseRecord(value: unknown, index: number): AlertStateRecord {
     lastNotifiedAt: readString(value, 'lastNotifiedAt'),
     lastResolvedAt: value['lastResolvedAt'] === null ? null : readString(value, 'lastResolvedAt'),
     notifiedChannels: channels.filter((item): item is AlertChannel => isAlertChannel(item)),
+    lastFinding: parseLastFinding(value['lastFinding'], index),
   };
+}
+
+function parseLastFinding(value: unknown, index: number): AlertFinding | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!isRecord(value) || typeof value['kind'] !== 'string' || !isFindingKind(value['kind'])) {
+    throw new AlertStateFileError(
+      `Alert state record ${String(index)} has an invalid lastFinding.`,
+    );
+  }
+  const pattern = value['pattern'];
+  if (typeof pattern !== 'string') {
+    throw new AlertStateFileError(
+      `Alert state record ${String(index)} lastFinding is missing a pattern.`,
+    );
+  }
+  switch (value['kind']) {
+    case 'pattern-growth':
+      return {
+        kind: 'pattern-growth',
+        pattern,
+        bytesBefore: readFinite(value, 'bytesBefore', index),
+        bytesAfter: readFinite(value, 'bytesAfter', index),
+        bytesGrowth: readFinite(value, 'bytesGrowth', index),
+        percentGrowth: optionalFinite(value['percentGrowth']),
+        growthPercentThreshold: optionalFinite(value['growthPercentThreshold']),
+        growthBytesThreshold: optionalFinite(value['growthBytesThreshold']),
+      };
+    case 'ttl-coverage-drop':
+      return {
+        kind: 'ttl-coverage-drop',
+        pattern,
+        ttlCoverageBefore: readFinite(value, 'ttlCoverageBefore', index),
+        ttlCoverageAfter: readFinite(value, 'ttlCoverageAfter', index),
+        dropPoints: readFinite(value, 'dropPoints', index),
+        thresholdPoints: readFinite(value, 'thresholdPoints', index),
+      };
+    case 'new-untimed-pattern':
+      return {
+        kind: 'new-untimed-pattern',
+        pattern,
+        ttlCoverageAfter: readFinite(value, 'ttlCoverageAfter', index),
+        estimatedBytes: readFinite(value, 'estimatedBytes', index),
+        estimatedKeyCount: readFinite(value, 'estimatedKeyCount', index),
+      };
+  }
+}
+
+function readFinite(record: Record<string, unknown>, key: string, index: number): number {
+  const value = record[key];
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new AlertStateFileError(
+      `Alert state record ${String(index)} lastFinding is missing ${key}.`,
+    );
+  }
+  return value;
+}
+
+function optionalFinite(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function readString(record: Record<string, unknown>, key: string): string {

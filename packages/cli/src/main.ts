@@ -365,7 +365,7 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
         writeLine: (line) => {
           streams.writeOut(`${line}\n`);
         },
-        extraOpeningLines: formatWatchAlertBanner(alertConfig),
+        extraOpeningLines: formatWatchAlertBanner(alertConfig, alertSetup.configPath),
         afterTick: async (report) => {
           if (alertConfig.rules.length === 0) {
             return;

@@ -27,6 +27,7 @@
     "prepublishOnly": "node -e \"throw new Error('Do not publish @redis-detective/cli. Run pnpm pack:cli and publish packages/cli/publish as redis-detective.')\""
   },
   "dependencies": {
+    "@redis-detective/alerts": "workspace:*",
     "@redis-detective/core-types": "workspace:*",
     "@redis-detective/evidence": "workspace:*",
     "@redis-detective/github-integration": "workspace:*",

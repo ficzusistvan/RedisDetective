@@ -62,3 +62,7 @@ asciinema rec --command './examples/ttl-drift-demo/run-demo.sh' demo.cast
 A starter tape, `demo.tape`, lives next to this README. The CI workflow
 `.github/workflows/ttl-drift-demo.yml` runs the same scenario through the
 GitHub Action and asserts the gate fails on buggy and passes on good.
+
+The same seed/bug/fix sequence is reused by `e2e/alerts-watch.test.mjs` to
+prove `watch` fires once, stays quiet inside `--alert-cooldown`, and sends
+resolve after the good write path is restored. See [docs/alerts.md](../../docs/alerts.md).

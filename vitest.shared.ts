@@ -20,6 +20,7 @@ export default defineConfig({
       '@redis-detective/evidence': packageEntry('evidence'),
       '@redis-detective/github-integration': packageEntry('github-integration'),
       '@redis-detective/reasoner': packageEntry('reasoner'),
+      '@redis-detective/alerts': packageEntry('alerts'),
       '@redis-detective/cli': packageEntry('cli'),
     },
   },

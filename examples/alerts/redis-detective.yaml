@@ -1,0 +1,28 @@
+# Example alert rules. Copy to .redis-detective.yaml in the directory you run
+# `watch` from, or pass --alert-config examples/alerts/redis-detective.yaml.
+#
+# Secrets stay in the environment (or a .env file). This file only names them.
+
+alerts:
+  cooldown: 1h
+  pagerdutyMinSeverity: critical
+  channels:
+    slack:
+      webhook: ${REDIS_DETECTIVE_SLACK_WEBHOOK}
+    webhook:
+      url: ${REDIS_DETECTIVE_WEBHOOK_URL}
+      secret: ${REDIS_DETECTIVE_WEBHOOK_SECRET}
+    pagerduty:
+      routingKey: ${REDIS_DETECTIVE_PAGERDUTY_ROUTING_KEY}
+      minSeverity: critical
+  rules:
+    - id: ttl-drop
+      severity: critical
+      channels: [slack, webhook, pagerduty]
+      ttlDropPoints: 20
+      newUntimedPatterns: true
+    - id: growth
+      severity: warning
+      channels: [slack, webhook]
+      growthPercent: 25
+      growthBytes: 10485760

@@ -57,6 +57,7 @@ const workspacePackages = [
   'evidence',
   'github-integration',
   'reasoner',
+  'alerts',
   'cli',
 ];
 for (const name of workspacePackages) {

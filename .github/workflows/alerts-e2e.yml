@@ -1,0 +1,46 @@
+name: Watch alerts e2e
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: alerts-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  alerts-e2e:
+    name: channels mock + TTL-drift watch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Channel integration (local HTTP mock)
+        run: node --test e2e/alerts-channels.test.mjs
+      - name: Watch fires once, suppresses, then resolves
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: node --test e2e/alerts-watch.test.mjs

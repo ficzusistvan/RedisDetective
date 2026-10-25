@@ -19,7 +19,8 @@
     "format:check": "prettier --check .",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run pack:cli",
     "pack:cli": "node scripts/stage-cli-publish.mjs",
-    "health-check": "pnpm --filter @redis-detective/cli run start"
+    "health-check": "pnpm --filter @redis-detective/cli run start",
+    "test:e2e:alerts": "node --test e2e/*.test.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",

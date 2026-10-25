@@ -11,9 +11,11 @@ named as the Cause; see [`CONTEXT.md`](CONTEXT.md) and
 output is a plain-language explanation an on-call engineer can act on, not a dashboard.
 
 **MVP scope is exactly that one question.** Anything else is out of scope for now. Latency
-root-cause, eviction root-cause, cost/billing correlation, multi-cloud support and alerting
-integrations are explicitly _not_ being built yet — see [`docs/mvp-scope.md`](docs/mvp-scope.md).
-If a change only makes sense for one of those, it does not belong in this repo yet.
+root-cause, eviction root-cause, cost/billing correlation, multi-cloud support and hosted
+alerting SaaS (email, Teams, Opsgenie, a dashboard) are explicitly _not_ being built yet — see
+[`docs/mvp-scope.md`](docs/mvp-scope.md). Local `watch` notifications (Slack, generic webhook,
+PagerDuty) reuse the CI-gate thresholds; see [`docs/alerts.md`](docs/alerts.md). If a change only
+makes sense for an out-of-scope item, it does not belong in this repo yet.
 
 Phase 1 ships as a standalone read-only CLI (`packages/cli`, "Redis Memory Health Check") that
 works against any Redis URL with no signup. GitHub is optional (`--repo`); when connected it lists
@@ -206,4 +208,7 @@ The README is what npm users see. Keep it operator-facing; contributor and relea
 Health check, sampler, evidence, CLI diagnosis, GitHub candidate lookup, and the reasoner
 (deterministic paragraph, optional LLM wording behind the validator) are implemented. The `watch`
 subcommand runs the diagnosis path on an interval into a local snapshot directory, with no commit
-lookup and no model call per tick. See `docs/mvp-scope.md` for build order.
+lookup and no model call per tick. When thresholds and a channel are configured it reuses the CI
+gate comparison and notifies Slack, a generic webhook, or PagerDuty (`packages/alerts`) without
+spamming: firing → resolved, cooldown, persisted state. `test-alert` / `alerts test` sends one
+sample per channel. See `docs/alerts.md` and `docs/mvp-scope.md`.

@@ -13,6 +13,7 @@
       "@redis-detective/evidence": ["./packages/evidence/src/index.ts"],
       "@redis-detective/github-integration": ["./packages/github-integration/src/index.ts"],
       "@redis-detective/reasoner": ["./packages/reasoner/src/index.ts"],
+      "@redis-detective/alerts": ["./packages/alerts/src/index.ts"],
       "@redis-detective/cli": ["./packages/cli/src/index.ts"]
     }
   },

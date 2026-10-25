@@ -19,6 +19,8 @@ import type {
   OpenSnapshotStore,
   WatchDeps,
 } from '@redis-detective/cli';
+import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
+import { createMemoryAlertStateStore } from '@redis-detective/alerts';
 import { GitHubApiError } from '@redis-detective/github-integration';
 import type { GitHubFetch } from '@redis-detective/github-integration';
 import { SAMPLER_DEFAULTS, SAMPLER_HARD_LIMITS } from '@redis-detective/sampler';
@@ -62,6 +64,9 @@ async function run(
     readonly githubFetch?: GitHubFetch;
     readonly stopSignal?: AbortSignal;
     readonly watchDeps?: WatchDeps;
+    readonly alertFetch?: AlertFetch;
+    readonly alertWait?: AlertWait;
+    readonly openAlertStateStore?: (path: string) => AlertStateStore;
   } = {},
 ): Promise<CapturedRun> {
   let out = '';
@@ -93,6 +98,10 @@ async function run(
       : { createCommitSource: options.createCommitSource }),
     ...(options.stopSignal === undefined ? {} : { stopSignal: options.stopSignal }),
     ...(options.watchDeps === undefined ? {} : { watchDeps: options.watchDeps }),
+    alertFetch:
+      options.alertFetch ?? (() => Promise.reject(new Error('unit tests must not send alerts'))),
+    alertWait: options.alertWait ?? (() => Promise.resolve()),
+    openAlertStateStore: options.openAlertStateStore ?? (() => createMemoryAlertStateStore()),
   };
 
   const exitCode = await main(context);
@@ -164,6 +173,10 @@ describe('main', () => {
       expect(help).toContain('--fail-on-growth-percent');
       expect(help).toContain('--warn-only');
       expect(help).toContain('Exit 7');
+      expect(help).toContain('--alert-slack-webhook');
+      expect(help).toContain('test-alert');
+      expect(help).toContain('--alert-dry-run');
+      expect(help).toContain('X-Redis-Detective-Signature');
     });
 
     it('prints the version', async () => {
@@ -672,6 +685,116 @@ describe('main', () => {
 
       expect(result.exitCode).toBe(EXIT_CODES.usageError);
       expect(result.err).toContain('watch');
+    });
+
+    it('accepts --fail-on-* as alert thresholds and dry-runs a payload without sending', async () => {
+      const stop = new AbortController();
+      const store = createMemorySnapshotStore(leakingSnapshots(), './snaps');
+      const fetches: string[] = [];
+
+      const result = await run(
+        [
+          'watch',
+          '--url',
+          'redis://localhost:6379',
+          '--snapshots',
+          './snaps',
+          '--fail-on-ttl-drop',
+          '20',
+          '--alert-slack-webhook',
+          'https://hooks.slack.com/services/T000/B000/secret',
+          '--alert-dry-run',
+        ],
+        {
+          openSnapshotStore: () => store,
+          stopSignal: stop.signal,
+          watchDeps: stopAfterFirstInterval(stop, []),
+          alertFetch: (url) => {
+            fetches.push(url);
+            return Promise.resolve({ status: 200, body: 'ok' });
+          },
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(fetches).toEqual([]);
+      expect(result.out).toContain('Alerts: slack');
+      expect(result.out).toContain('alert firing');
+      expect(result.out).toContain('--- alert dry-run slack ---');
+      expect(result.out).toContain('cart:items:*');
+      expect(result.out).not.toContain('secret');
+      expect(result.out).not.toContain('T000');
+    });
+
+    it('refuses --warn-only on watch', async () => {
+      const result = await run([
+        'watch',
+        '--url',
+        'redis://localhost:6379',
+        '--snapshots',
+        './snaps',
+        '--fail-on-ttl-drop',
+        '20',
+        '--warn-only',
+      ]);
+
+      expect(result.exitCode).toBe(EXIT_CODES.usageError);
+      expect(result.err).toContain('--warn-only');
+    });
+  });
+
+  describe('test-alert', () => {
+    it('sends one sample notification per configured channel', async () => {
+      const posts: { url: string; body: string; headers: Readonly<Record<string, string>> }[] = [];
+
+      const result = await run(
+        [
+          'test-alert',
+          '--alert-webhook-url',
+          'https://example.com/hook',
+          '--alert-webhook-secret',
+          's3cret',
+          '--url',
+          'redis://:hunter2@localhost:6379',
+        ],
+        {
+          alertFetch: (url, init) => {
+            posts.push({ url, body: init.body, headers: init.headers });
+            return Promise.resolve({ status: 202, body: 'ok' });
+          },
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.out).toContain('test-alert webhook: sent');
+      expect(posts).toHaveLength(1);
+      expect(posts[0]?.url).toBe('https://example.com/hook');
+      expect(posts[0]?.headers['x-redis-detective-signature']).toMatch(/^sha256=[0-9a-f]+$/);
+      expect(posts[0]?.body).toContain('session:*');
+      expect(posts[0]?.body).not.toContain('hunter2');
+      expect(result.out).not.toContain('hunter2');
+      expect(result.out).not.toContain('s3cret');
+    });
+
+    it('accepts alerts test as an alias and refuses to run with no channel', async () => {
+      const alias = await run(
+        [
+          'alerts',
+          'test',
+          '--alert-dry-run',
+          '--alert-slack-webhook',
+          'https://hooks.slack.com/services/T/B/x',
+        ],
+        {
+          alertFetch: () => Promise.resolve({ status: 200, body: 'ok' }),
+        },
+      );
+      expect(alias.exitCode).toBe(EXIT_CODES.ok);
+      expect(alias.out).toContain('--- alert dry-run slack ---');
+
+      const missing = await run(['test-alert']);
+      expect(missing.exitCode).toBe(EXIT_CODES.usageError);
+      expect(missing.err).toContain('channel');
     });
   });
 

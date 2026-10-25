@@ -76,7 +76,11 @@ you pass `--repo`, so a long session makes no GitHub requests — pass `--repo` 
 instead.
 
 This is a local loop writing JSON files to a directory you chose: no daemon, no server, no
-retention policy, and nothing leaves the machine.
+retention policy. When you arm `--fail-on-*` (the same thresholds as the CI gate) and a
+channel, a breach can notify Slack, a generic webhook, or PagerDuty. A persistent breach is
+deduplicated and held to `--alert-cooldown` (default 1h) so a 15-minute tick does not spam;
+state is a small JSON file next to the snapshots so a restart does not re-page. See
+[docs/alerts.md](docs/alerts.md).
 
 ## Optional: candidate commits (recommended second step)
 
@@ -255,9 +259,27 @@ sampling deadline of at most **30 s** (CLI `--timeout` defaults to 10 s and 
 ceiling), and an oversized `--sample-size` is **reduced**, not honoured. It never deletes keys,
 sets TTLs, or writes to Redis.
 
-This CLI does not write to Redis and does not treat commits as the Cause of growth. It does not
-alert you either: `watch` accumulates samples in a local directory and says one line about each,
-but nothing here decides that something is wrong or tells anyone about it.
+This CLI does not write to Redis and does not treat commits as the Cause of growth. Alerting is
+opt-in on `watch`: without `--fail-on-*` / a config file and a channel, it still only prints one
+line per sample. Webhook URLs, routing keys, Redis passwords, and example keys are redacted in
+logs and payloads.
+
+## Watch alerts
+
+```bash
+export REDIS_DETECTIVE_SLACK_WEBHOOK='https://hooks.slack.com/services/…'
+redis-detective watch --url redis://localhost:6379 --snapshots ./snaps \
+  --fail-on-ttl-drop 20 --alert-severity critical
+redis-detective test-alert   # or: redis-detective alerts test --alert-dry-run
+```
+
+Channels, in priority order: Slack incoming webhook (Block Kit), a generic versioned JSON
+webhook with optional HMAC-SHA256 (`X-Redis-Detective-Signature`), and PagerDuty Events API v2
+(stable `dedup_key` per host+pattern+rule; resolve when the condition clears). By default only
+`critical` rules page. Flags and `REDIS_DETECTIVE_*` env vars work; an optional
+`.redis-detective.json` / `.yaml` can name several rules. Setup, payload schema, and a sample
+Slack message: [docs/alerts.md](docs/alerts.md),
+[`examples/alerts/slack-sample.json`](examples/alerts/slack-sample.json).
 
 ## License
 

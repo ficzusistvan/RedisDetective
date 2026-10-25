@@ -11,6 +11,7 @@
     { "path": "../sampler" },
     { "path": "../evidence" },
     { "path": "../github-integration" },
-    { "path": "../reasoner" }
+    { "path": "../reasoner" },
+    { "path": "../alerts" }
   ]
 }

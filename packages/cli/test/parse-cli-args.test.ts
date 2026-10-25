@@ -40,6 +40,12 @@ describe('parseCliArgs', () => {
     expect(options.help).toBe(false);
   });
 
+  it('reads test-alert and alerts test as the same command', () => {
+    expect(parseCliArgs(['test-alert', '--alert-dry-run']).command).toBe('test-alert');
+    expect(parseCliArgs(['alerts', 'test', '--alert-dry-run']).command).toBe('test-alert');
+    expect(parseCliArgs(['alerts', 'test']).alertDryRun).toBe(false);
+  });
+
   it('reads a leading watch subcommand without losing the flags after it', () => {
     const options = parseCliArgs([
       'watch',
@@ -200,6 +206,37 @@ describe('parseCliArgs', () => {
     });
     expect(() => parseCliArgs(['--fail-on-growth-percent', '-1'])).toThrow(CliUsageError);
     expect(() => parseCliArgs(['--write-json='])).toThrow(CliUsageError);
+  });
+
+  it('reads alert flags and REDIS_DETECTIVE_* env fallbacks', () => {
+    const options = parseCliArgs(
+      [
+        'watch',
+        '--alert-dry-run',
+        '--alert-cooldown',
+        '30m',
+        '--alert-severity',
+        'critical',
+        '--alert-pagerduty-min-severity',
+        'warning',
+      ],
+      {
+        REDIS_DETECTIVE_SLACK_WEBHOOK: 'https://hooks.slack.com/services/T/B/x',
+        REDIS_DETECTIVE_WEBHOOK_URL: 'https://example.com/hook',
+        REDIS_DETECTIVE_WEBHOOK_SECRET: 's3cret',
+        REDIS_DETECTIVE_PAGERDUTY_ROUTING_KEY: 'R02EXAMPLE',
+      },
+    );
+
+    expect(options.alertDryRun).toBe(true);
+    expect(options.alertCooldownMs).toBe(30 * 60 * 1_000);
+    expect(options.alertSeverity).toBe('critical');
+    expect(options.alertPagerdutyMinSeverity).toBe('warning');
+    expect(options.alertSlackWebhook).toBe('https://hooks.slack.com/services/T/B/x');
+    expect(options.alertWebhookUrl).toBe('https://example.com/hook');
+    expect(options.alertWebhookSecret).toBe('s3cret');
+    expect(options.alertPagerdutyRoutingKey).toBe('R02EXAMPLE');
+    expect(() => parseCliArgs(['--alert-severity', 'loud'])).toThrow(CliUsageError);
   });
 
   it('recognises help and version in short and long form', () => {

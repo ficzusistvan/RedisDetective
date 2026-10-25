@@ -97,6 +97,16 @@ export type { RunWatchRequest, WatchDeps, WatchSummary } from './run-watch.js';
 export { formatWatchTick } from './format-watch-tick.js';
 export type { WatchTick } from './format-watch-tick.js';
 
+export { evaluateAlertRules } from './evaluate-alert-rules.js';
+export { formatWatchAlertBanner } from './format-watch-alert-banner.js';
+export { resolveAlertConfig } from './resolve-alert-config.js';
+export type {
+  ResolveAlertConfigRequest,
+  ResolvedAlertConfigWithPath,
+} from './resolve-alert-config.js';
+export { runTestAlert } from './run-test-alert.js';
+export type { RunTestAlertRequest, RunTestAlertResult } from './run-test-alert.js';
+
 export { renderTextReport } from './render-text-report.js';
 export { renderMarkdownReport } from './render-markdown-report.js';
 export { JSON_REPORT_SCHEMA_VERSION, renderJsonReport } from './render-json-report.js';

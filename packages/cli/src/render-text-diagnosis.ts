@@ -9,13 +9,14 @@ import type {
 
 import { collectSamplingWarnings } from './collect-sampling-warnings.js';
 import type { DiagnosisReport } from './diagnosis-report.js';
+import type { CiGateResult } from './evaluate-ci-gate.js';
 import { EVIDENCE_VOCABULARY, STRENGTH_LABEL } from './evidence-vocabulary.js';
 import {
-  formatBytes,
-  formatCount,
-  formatEstimatedBytes,
-  formatPercent,
-} from './format-bytes.js';
+  formatCiGateFindingDetail,
+  formatCiGateFindingRule,
+  formatCiGateOutcome,
+} from './format-ci-gate-finding.js';
+import { formatBytes, formatCount, formatEstimatedBytes, formatPercent } from './format-bytes.js';
 
 const TEMPORAL_LABEL: Record<TemporalRelation, string> = {
   'before-anomaly': 'before the growth',
@@ -166,8 +167,7 @@ function renderCommitCandidates(report: DiagnosisReport): string | null {
     return null;
   }
 
-  const lookback =
-    report.lookbackHours === null ? null : formatLookback(report.lookbackHours);
+  const lookback = report.lookbackHours === null ? null : formatLookback(report.lookbackHours);
   const intro = [
     heading('Candidate commits'),
     'These are commits in the growth window or the lookback before it. A matching key prefix is a Pattern hint, not proof.',
@@ -242,6 +242,32 @@ function describeTopPattern(pattern: RedisSnapshot['patterns'][number]): string 
   return `${pattern.pattern}  (${size}, ${ttlShare(pattern)})`;
 }
 
+function renderGateText(gate: CiGateResult | null): string | null {
+  if (gate === null) {
+    return null;
+  }
+
+  const lines = [heading('Gate'), `Outcome  ${formatCiGateOutcome(gate)}`];
+  if (gate.findings.length === 0) {
+    lines.push(
+      gate.outcome === 'skipped'
+        ? 'No comparison was made.'
+        : 'No configured threshold was crossed.',
+    );
+  } else {
+    for (const [index, finding] of gate.findings.entries()) {
+      lines.push(
+        `${String(index + 1)}. ${finding.pattern} — ${formatCiGateFindingRule(finding)}`,
+        `   ${formatCiGateFindingDetail(finding)}`,
+      );
+    }
+  }
+  for (const note of gate.notes) {
+    lines.push(`   ! ${note}`);
+  }
+  return lines.join('\n');
+}
+
 function latestSnapshot(snapshots: readonly RedisSnapshot[]): RedisSnapshot | undefined {
   if (snapshots.length === 0) {
     return undefined;
@@ -295,11 +321,15 @@ function renderLatestSnapshot(snapshot: RedisSnapshot | undefined): string | nul
  * omitted: an empty diagnosis without them would read as "your Redis is fine". Plain ASCII, no
  * colour, no escape codes — this output gets pasted into tickets.
  */
-export function renderTextDiagnosis(report: DiagnosisReport): string {
+export function renderTextDiagnosis(
+  report: DiagnosisReport,
+  gate: CiGateResult | null = null,
+): string {
   const { graph } = report;
   const sections = [
     renderHeader(report),
     renderExplanation(report),
+    renderGateText(gate),
     renderSection(
       'Causes',
       graph.attributions.map((attribution, index) =>

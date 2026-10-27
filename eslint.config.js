@@ -198,12 +198,21 @@ export default tseslint.config(
 
   // Developer scripts run under Node directly, outside any package.
   {
-    files: ['scripts/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'action/**/*.mjs', 'examples/**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
-      globals: { console: 'readonly', process: 'readonly' },
+      globals: {
+        Buffer: 'readonly',
+        URL: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        process: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
     },
   },
 );

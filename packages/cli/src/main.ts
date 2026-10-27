@@ -15,6 +15,9 @@ import type {
 } from '@redis-detective/github-integration';
 import type { LlmClient } from '@redis-detective/reasoner';
 
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
 import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
 import { RedisConnectionError, createRedisClient } from './create-redis-client.js';
@@ -22,6 +25,8 @@ import type { RedisConnection } from './create-redis-client.js';
 import { createGitHubCommitSource } from './create-github-commit-source.js';
 import type { ReadGhAuthToken } from './create-github-commit-source.js';
 import { createLlmClientFromEnv } from './create-llm-client-from-env.js';
+import { evaluateCiGate, hasCiGateThresholds } from './evaluate-ci-gate.js';
+import type { CiGateResult } from './evaluate-ci-gate.js';
 import { EXIT_CODES } from './exit-codes.js';
 import type { ExitCode } from './exit-codes.js';
 import { CliUsageError, parseCliArgs } from './parse-cli-args.js';
@@ -30,6 +35,8 @@ import { StoredSnapshotError } from './parse-stored-snapshot.js';
 import { redactRedisUrl } from './redact-redis-url.js';
 import { renderJsonDiagnosis } from './render-json-diagnosis.js';
 import { renderJsonReport } from './render-json-report.js';
+import { renderMarkdownDiagnosis } from './render-markdown-diagnosis.js';
+import { renderMarkdownReport } from './render-markdown-report.js';
 import { renderTextDiagnosis } from './render-text-diagnosis.js';
 import { renderTextReport } from './render-text-report.js';
 import { runDiagnosis } from './run-diagnosis.js';
@@ -150,6 +157,13 @@ export async function main(context: MainContext): Promise<ExitCode> {
     return runWatchCommand(context, options);
   }
 
+  if (gateFlagsRequireSnapshots(options) && options.snapshotDirectory === null) {
+    context.streams.writeError(
+      `CI gate flags (--fail-on-*, --warn-only) require --snapshots so there is a baseline to compare.\nRun ${CLI_NAME} --help for usage.\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+
   if (options.intervalMs !== null) {
     streams.writeError(
       `--interval requires the watch subcommand: ${CLI_NAME} watch --url redis://host:port --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`,
@@ -217,7 +231,14 @@ async function runHealthCheckCommand(
       generatedAt: context.now().toISOString(),
     });
 
-    streams.writeOut(options.json ? renderJsonReport(report) : renderTextReport(report));
+    const rendered =
+      options.outputFormat === 'json'
+        ? renderJsonReport(report)
+        : options.outputFormat === 'markdown'
+          ? renderMarkdownReport(report)
+          : renderTextReport(report);
+    streams.writeOut(rendered);
+    await writeJsonSideChannel(options.writeJsonPath, renderJsonReport(report));
     return EXIT_CODES.ok;
   } catch (error) {
     return reportCaughtError(streams, error);
@@ -250,9 +271,15 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     );
     return EXIT_CODES.usageError;
   }
-  if (options.json) {
+  if (options.outputFormat !== 'text') {
     streams.writeError(
-      `watch prints one line per sample, so --json does not apply. Run ${CLI_NAME} --snapshots ${snapshotDirectory} --json for a machine-readable diagnosis.\n`,
+      `watch prints one line per sample, so --format / --json do not apply. Run ${CLI_NAME} --snapshots ${snapshotDirectory} --json for a machine-readable diagnosis.\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+  if (options.writeJsonPath !== null || gateFlagsRequireSnapshots(options)) {
+    streams.writeError(
+      `watch does not evaluate a CI gate. Run ${CLI_NAME} --snapshots ${snapshotDirectory} with the gate flags for a one-shot comparison.\n`,
     );
     return EXIT_CODES.usageError;
   }
@@ -430,7 +457,18 @@ async function writeDiagnosis(
   const { streams } = context;
   try {
     const report = await runDiagnosis(request);
-    streams.writeOut(options.json ? renderJsonDiagnosis(report) : renderTextDiagnosis(report));
+    const gate = gateFlagsRequireSnapshots(options)
+      ? evaluateCiGate({
+          snapshots: report.snapshots,
+          thresholds: options.gateThresholds,
+          warnOnly: options.warnOnly,
+        })
+      : null;
+    streams.writeOut(renderDiagnosis(options.outputFormat, report, gate));
+    await writeJsonSideChannel(options.writeJsonPath, renderJsonDiagnosis(report, gate));
+    if (gate?.outcome === 'fail') {
+      return EXIT_CODES.thresholdExceeded;
+    }
     if (report.graph.gaps.some((gap) => gap.kind === 'github-unavailable')) {
       return EXIT_CODES.githubError;
     }
@@ -438,6 +476,33 @@ async function writeDiagnosis(
   } catch (error) {
     return reportCaughtError(streams, error);
   }
+}
+
+function gateFlagsRequireSnapshots(options: CliOptions): boolean {
+  return options.warnOnly || hasCiGateThresholds(options.gateThresholds);
+}
+
+function renderDiagnosis(
+  format: CliOptions['outputFormat'],
+  report: Parameters<typeof renderTextDiagnosis>[0],
+  gate: CiGateResult | null,
+): string {
+  switch (format) {
+    case 'json':
+      return renderJsonDiagnosis(report, gate);
+    case 'markdown':
+      return renderMarkdownDiagnosis(report, gate);
+    case 'text':
+      return renderTextDiagnosis(report, gate);
+  }
+}
+
+async function writeJsonSideChannel(path: string | null, contents: string): Promise<void> {
+  if (path === null) {
+    return;
+  }
+  await mkdir(dirname(path), { recursive: true });
+  await writeFile(path, contents, 'utf8');
 }
 
 type OpenedConnection =

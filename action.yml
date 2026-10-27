@@ -1,0 +1,136 @@
+name: Redis Detective
+description: >
+  Sample a Redis instance, compare it to a baseline snapshot, write a Markdown
+  summary, and fail the job when memory growth or TTL-drift thresholds are crossed.
+author: Redis Detective
+branding:
+  icon: search
+  color: red
+
+inputs:
+  redis-url:
+    description: >
+      Redis connection URL. Defaults to $REDIS_URL. Passed to the CLI via the
+      environment, never written to logs or the job summary.
+    required: false
+    default: ''
+  snapshots-dir:
+    description: >
+      Directory of snapshot JSON files. A live sample (when a URL is set) is
+      appended here, then the whole series is diagnosed. Reuse the same
+      directory later in the job to compare against a snapshot taken earlier.
+    required: false
+    default: .redis-detective/snapshots
+  baseline-path:
+    description: >
+      Optional snapshot file or directory copied into snapshots-dir before
+      sampling. Use a committed baseline, an artifact from a previous run, or
+      omit this and run the action twice on the same snapshots-dir.
+    required: false
+    default: ''
+  sample-size:
+    description: Keys to sample. Clamped by the CLI to a safe ceiling.
+    required: false
+    default: ''
+  timeout:
+    description: Sampling wall-clock budget in milliseconds. Clamped by the CLI.
+    required: false
+    default: ''
+  memory-samples:
+    description: SAMPLES for MEMORY USAGE on nested values.
+    required: false
+    default: ''
+  databases:
+    description: Comma-separated database indexes to sample (default 0).
+    required: false
+    default: ''
+  redact-keys:
+    description: Replace example key names. Defaults to true for CI output.
+    required: false
+    default: 'true'
+  growth-percent:
+    description: >
+      Fail when a compared pattern's estimated bytes grow by more than this
+      percent. Combined with growth-bytes (both must trip). Set off/none to disable.
+    required: false
+    default: '25'
+  growth-bytes:
+    description: >
+      Fail when a compared pattern's estimated bytes grow by more than this
+      many bytes. Combined with growth-percent. Default 10 MiB. Set off/none to disable.
+    required: false
+    default: '10485760'
+  ttl-drop-points:
+    description: >
+      Fail when a compared pattern's TTL coverage drops by more than this many
+      percentage points (20 means 90% → 70%). Set off/none to disable.
+    required: false
+    default: '20'
+  new-untimed-patterns:
+    description: Fail when a pattern first appears with effectively no TTL.
+    required: false
+    default: 'true'
+  fail-on:
+    description: fail (default) exits non-zero when a threshold is crossed; warn-only does not.
+    required: false
+    default: fail
+  comment:
+    description: >
+      Post or update a single sticky PR comment when the event is pull_request
+      and a token is available. One comment is updated in place; not one per run.
+    required: false
+    default: 'true'
+  github-token:
+    description: Token used only for the sticky PR comment. Never printed.
+    required: false
+    default: ${{ github.token }}
+  cli-command:
+    description: >
+      Override how the CLI is invoked. Default is `npx --yes redis-detective`.
+      In this repo, pass `node packages/cli/dist/bin.js` after `pnpm build`.
+    required: false
+    default: ''
+  working-directory:
+    description: Directory to run from (relative to the workspace).
+    required: false
+    default: '.'
+
+outputs:
+  outcome:
+    description: pass, fail, warn, skipped, or error
+    value: ${{ steps.gate.outputs.outcome }}
+  findings-count:
+    description: Number of threshold findings
+    value: ${{ steps.gate.outputs.findings-count }}
+  markdown-path:
+    description: Path to the Markdown report written by this run
+    value: ${{ steps.gate.outputs.markdown-path }}
+  json-path:
+    description: Path to the JSON report written by this run
+    value: ${{ steps.gate.outputs.json-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run Redis Detective CI gate
+      id: gate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RD_REDIS_URL: ${{ inputs.redis-url }}
+        RD_SNAPSHOTS_DIR: ${{ inputs.snapshots-dir }}
+        RD_BASELINE_PATH: ${{ inputs.baseline-path }}
+        RD_SAMPLE_SIZE: ${{ inputs.sample-size }}
+        RD_TIMEOUT: ${{ inputs.timeout }}
+        RD_MEMORY_SAMPLES: ${{ inputs.memory-samples }}
+        RD_DATABASES: ${{ inputs.databases }}
+        RD_REDACT_KEYS: ${{ inputs.redact-keys }}
+        RD_GROWTH_PERCENT: ${{ inputs.growth-percent }}
+        RD_GROWTH_BYTES: ${{ inputs.growth-bytes }}
+        RD_TTL_DROP_POINTS: ${{ inputs.ttl-drop-points }}
+        RD_NEW_UNTIMED_PATTERNS: ${{ inputs.new-untimed-patterns }}
+        RD_FAIL_ON: ${{ inputs.fail-on }}
+        RD_COMMENT: ${{ inputs.comment }}
+        RD_CLI_COMMAND: ${{ inputs.cli-command }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      run: node "${{ github.action_path }}/action/run.mjs"

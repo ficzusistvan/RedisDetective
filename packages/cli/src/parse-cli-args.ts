@@ -5,6 +5,9 @@ import {
 
 import { commandFromArgv } from './command-from-argv.js';
 import type { CliCommand } from './command-from-argv.js';
+import type { CiGateThresholds } from './evaluate-ci-gate.js';
+import { isCliOutputFormat } from './output-format.js';
+import type { CliOutputFormat } from './output-format.js';
 import { MIN_WATCH_INTERVAL_MS } from './watch-defaults.js';
 
 export interface CliOptions {
@@ -12,7 +15,9 @@ export interface CliOptions {
   readonly command: CliCommand;
   /** `null` when `--help` or `--version` was requested, or when no URL was supplied. */
   readonly redisUrl: string | null;
+  /** `--json` is an alias for `--format json`. */
   readonly json: boolean;
+  readonly outputFormat: CliOutputFormat;
   readonly sampleSize: number | null;
   readonly timeoutMs: number | null;
   /** `SAMPLES` for `MEMORY USAGE` on nested values. `null` leaves the sampler's default. */
@@ -39,6 +44,14 @@ export interface CliOptions {
   readonly lookbackHours: number | null;
   /** Milliseconds between `watch` samples. `null` means the watch default. */
   readonly intervalMs: number | null;
+  /**
+   * Optional side-channel JSON path. Stdout still follows `--format`, so a CI job can keep
+   * Markdown on stdout and a machine-readable report on disk from one sample.
+   */
+  readonly writeJsonPath: string | null;
+  readonly gateThresholds: CiGateThresholds;
+  /** Crossed thresholds become warnings and the process still exits 0. */
+  readonly warnOnly: boolean;
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -52,7 +65,9 @@ export class CliUsageError extends Error {
 
 interface MutableCliOptions {
   redisUrl: string | null;
-  json: boolean;
+  outputFormat: CliOutputFormat;
+  formatFlagSeen: boolean;
+  jsonFlagSeen: boolean;
   sampleSize: number | null;
   timeoutMs: number | null;
   memorySamples: number | null;
@@ -63,6 +78,14 @@ interface MutableCliOptions {
   repository: string | null;
   lookbackHours: number | null;
   intervalMs: number | null;
+  writeJsonPath: string | null;
+  gateThresholds: {
+    growthPercent: number | null;
+    growthBytes: number | null;
+    ttlDropPoints: number | null;
+    newUntimedPatterns: boolean;
+  };
+  warnOnly: boolean;
   help: boolean;
   version: boolean;
 }
@@ -79,6 +102,14 @@ function parseNonNegativeInteger(flag: string, raw: string): number {
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {
     throw new CliUsageError(`${flag} expects a non-negative integer, received "${raw}".`);
+  }
+  return value;
+}
+
+function parseNonNegativeNumber(flag: string, raw: string): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value < 0) {
+    throw new CliUsageError(`${flag} expects a non-negative number, received "${raw}".`);
   }
   return value;
 }
@@ -161,7 +192,9 @@ export function parseCliArgs(
   const { command, flags } = commandFromArgv(argv);
   const options: MutableCliOptions = {
     redisUrl: null,
-    json: false,
+    outputFormat: 'text',
+    formatFlagSeen: false,
+    jsonFlagSeen: false,
     sampleSize: null,
     timeoutMs: null,
     memorySamples: null,
@@ -172,6 +205,14 @@ export function parseCliArgs(
     repository: null,
     lookbackHours: null,
     intervalMs: null,
+    writeJsonPath: null,
+    gateThresholds: {
+      growthPercent: null,
+      growthBytes: null,
+      ttlDropPoints: null,
+      newUntimedPatterns: false,
+    },
+    warnOnly: false,
     help: false,
     version: false,
   };
@@ -215,7 +256,58 @@ export function parseCliArgs(
         break;
 
       case '--json':
-        options.json = true;
+        options.jsonFlagSeen = true;
+        options.outputFormat = 'json';
+        break;
+
+      case '--format': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (!isCliOutputFormat(value)) {
+          throw new CliUsageError(`--format expects text, json or markdown, received "${value}".`);
+        }
+        options.formatFlagSeen = true;
+        options.outputFormat = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--write-json': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--write-json expects a file path.');
+        }
+        options.writeJsonPath = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--fail-on-growth-percent': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.gateThresholds.growthPercent = parseNonNegativeNumber(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--fail-on-growth-bytes': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.gateThresholds.growthBytes = parseNonNegativeNumber(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--fail-on-ttl-drop': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.gateThresholds.ttlDropPoints = parseNonNegativeNumber(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--fail-on-new-untimed-patterns':
+        options.gateThresholds.newUntimedPatterns = true;
+        break;
+
+      case '--warn-only':
+        options.warnOnly = true;
         break;
 
       case '--redact-keys':
@@ -321,7 +413,23 @@ export function parseCliArgs(
     options.repository = repositoryFallbackFromEnv(env);
   }
 
-  return { command, ...options };
+  if (options.formatFlagSeen && options.jsonFlagSeen && options.outputFormat !== 'json') {
+    throw new CliUsageError('--json and --format disagree. Use one of them.');
+  }
+
+  const { formatFlagSeen: _formatFlagSeen, jsonFlagSeen: _jsonFlagSeen, ...parsed } = options;
+
+  return {
+    command,
+    ...parsed,
+    json: parsed.outputFormat === 'json',
+    gateThresholds: {
+      growthPercent: parsed.gateThresholds.growthPercent,
+      growthBytes: parsed.gateThresholds.growthBytes,
+      ttlDropPoints: parsed.gateThresholds.ttlDropPoints,
+      newUntimedPatterns: parsed.gateThresholds.newUntimedPatterns,
+    } satisfies CiGateThresholds,
+  };
 }
 
 /**

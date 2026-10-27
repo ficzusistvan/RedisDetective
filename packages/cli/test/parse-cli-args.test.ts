@@ -26,6 +26,15 @@ describe('parseCliArgs', () => {
     expect(options.command).toBe('report');
     expect(options.redisUrl).toBeNull();
     expect(options.json).toBe(false);
+    expect(options.outputFormat).toBe('text');
+    expect(options.writeJsonPath).toBeNull();
+    expect(options.warnOnly).toBe(false);
+    expect(options.gateThresholds).toEqual({
+      growthPercent: null,
+      growthBytes: null,
+      ttlDropPoints: null,
+      newUntimedPatterns: false,
+    });
     expect(options.sampleSize).toBeNull();
     expect(options.intervalMs).toBeNull();
     expect(options.help).toBe(false);
@@ -154,6 +163,43 @@ describe('parseCliArgs', () => {
         GITHUB_APP_ID: '42',
       }).repository,
     ).toBe('acme/flag');
+  });
+
+  it('reads --format and treats --json as --format json', () => {
+    expect(parseCliArgs(['--format', 'markdown']).outputFormat).toBe('markdown');
+    expect(parseCliArgs(['--format=json']).outputFormat).toBe('json');
+    expect(parseCliArgs(['--format=json']).json).toBe(true);
+    expect(parseCliArgs(['--json']).outputFormat).toBe('json');
+    expect(() => parseCliArgs(['--format', 'yaml'])).toThrow(CliUsageError);
+    expect(() => parseCliArgs(['--json', '--format', 'markdown'])).toThrow(CliUsageError);
+  });
+
+  it('reads --write-json and the CI gate flags', () => {
+    const options = parseCliArgs([
+      '--snapshots',
+      './snaps',
+      '--write-json',
+      '/tmp/report.json',
+      '--fail-on-growth-percent',
+      '25',
+      '--fail-on-growth-bytes',
+      '10485760',
+      '--fail-on-ttl-drop',
+      '20.5',
+      '--fail-on-new-untimed-patterns',
+      '--warn-only',
+    ]);
+
+    expect(options.writeJsonPath).toBe('/tmp/report.json');
+    expect(options.warnOnly).toBe(true);
+    expect(options.gateThresholds).toEqual({
+      growthPercent: 25,
+      growthBytes: 10_485_760,
+      ttlDropPoints: 20.5,
+      newUntimedPatterns: true,
+    });
+    expect(() => parseCliArgs(['--fail-on-growth-percent', '-1'])).toThrow(CliUsageError);
+    expect(() => parseCliArgs(['--write-json='])).toThrow(CliUsageError);
   });
 
   it('recognises help and version in short and long form', () => {

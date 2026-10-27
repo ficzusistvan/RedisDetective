@@ -1,0 +1,117 @@
+name: TTL drift demo
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ttl-drift-demo-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  good:
+    name: good write path passes the gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Seed good write path
+        run: node examples/ttl-drift-demo/write-keys.mjs --mode good --url redis://127.0.0.1:6379
+      - name: Capture baseline
+        uses: ./
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/good
+          cli-command: node packages/cli/dist/bin.js
+          comment: 'false'
+      - name: Rewrite the same keys the good way
+        run: node examples/ttl-drift-demo/write-keys.mjs --mode good --url redis://127.0.0.1:6379
+      - name: Gate should pass
+        id: gate
+        uses: ./
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/good
+          cli-command: node packages/cli/dist/bin.js
+          comment: 'false'
+          fail-on: fail
+      - name: Prove the gate passed
+        run: |
+          test "${{ steps.gate.outputs.outcome }}" = "pass"
+
+  buggy:
+    name: buggy write path fails the gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Seed good write path
+        run: node examples/ttl-drift-demo/write-keys.mjs --mode good --url redis://127.0.0.1:6379
+      - name: Capture baseline
+        uses: ./
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/buggy
+          cli-command: node packages/cli/dist/bin.js
+          comment: 'false'
+      - name: Apply the buggy write path (session:* loses TTL)
+        run: node examples/ttl-drift-demo/write-keys.mjs --mode buggy --url redis://127.0.0.1:6379
+      - name: Gate should fail
+        id: gate
+        continue-on-error: true
+        uses: ./
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/buggy
+          cli-command: node packages/cli/dist/bin.js
+          comment: 'false'
+          fail-on: fail
+          ttl-drop-points: '20'
+      - name: Prove the gate failed on session:*
+        run: |
+          test "${{ steps.gate.outcome }}" = "failure"
+          test "${{ steps.gate.outputs.outcome }}" = "fail"
+          grep -F 'session:*' "${{ steps.gate.outputs.markdown-path }}"
+          grep -E 'TTL coverage drop|TTLs disappeared' "${{ steps.gate.outputs.markdown-path }}"

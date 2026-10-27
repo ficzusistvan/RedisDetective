@@ -1,0 +1,66 @@
+# Copy into .github/workflows/redis-detective.yml in an application repo.
+#
+# Baseline design (pick one):
+#   1. Commit a snapshots directory and pass it as baseline-path.
+#   2. Download an artifact from a previous run into baseline-path.
+#   3. Run this action twice in the same job on the same snapshots-dir
+#      (first tick stores the baseline; the second compares).
+#
+# The action never prints redis-url. Prefer a replica or a read-only ACL user.
+
+name: Redis Detective
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  redis-memory:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v5
+
+      # Seed whatever your app writes. This example uses the in-repo demo writer.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 20
+      - name: Seed Redis (good write path)
+        env:
+          REDIS_URL: redis://127.0.0.1:6379
+        run: node examples/ttl-drift-demo/write-keys.mjs --mode good --url "$REDIS_URL"
+
+      - name: Capture baseline
+        uses: ficzusistvan/RedisDetective@main
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/snapshots
+          comment: 'false'
+          # Until a release is tagged, this repo should pass the built CLI:
+          # cli-command: node packages/cli/dist/bin.js
+
+      - name: Compare after the next change
+        uses: ficzusistvan/RedisDetective@main
+        with:
+          redis-url: redis://127.0.0.1:6379
+          snapshots-dir: .redis-detective/snapshots
+          growth-percent: '25'
+          growth-bytes: '10485760'
+          ttl-drop-points: '20'
+          new-untimed-patterns: 'true'
+          fail-on: fail
+          comment: 'true'

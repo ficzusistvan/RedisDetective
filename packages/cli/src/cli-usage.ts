@@ -23,6 +23,8 @@ Usage
   ${CLI_NAME} --url redis://localhost:6379 --json > report.json
   ${CLI_NAME} --url redis://localhost:6379 --snapshots ./snaps
   ${CLI_NAME} --snapshots ./snaps
+  ${CLI_NAME} --snapshots ./snaps --format markdown
+  ${CLI_NAME} --snapshots ./snaps --fail-on-ttl-drop 20 --fail-on-growth-percent 25
   ${CLI_NAME} --snapshots ./snaps --repo owner/repo
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --interval 15m
 
@@ -43,6 +45,12 @@ Commands
 Options
   -u, --url <url>         Redis connection URL. Defaults to $REDIS_URL.
       --json              Emit a machine-readable JSON report instead of text.
+                          Same as --format json.
+      --format <name>     text (default), json, or markdown. Markdown is for GitHub
+                          job summaries and PR comments; it never prints example keys.
+      --write-json <file> Also write the JSON report to a file. Stdout still follows
+                          --format, so CI can keep Markdown on stdout and JSON on disk
+                          from a single sample.
       --sample-size <n>   Keys to sample. Clamped to a safe ceiling (default 1000).
       --timeout <ms>      Wall-clock budget for sampling, in milliseconds. Clamped to a safe
                           ceiling of ${String(SAMPLER_HARD_LIMITS.maxDurationMs)} (default 10000).
@@ -80,6 +88,24 @@ Options
       --lookback-hours <n>
                           Hours before the growth window to include in the commit search
                           (default ${String(DEFAULT_COMMIT_LOOKBACK_HOURS)}, i.e. ${String(DEFAULT_COMMIT_LOOKBACK_HOURS / 24)} days). Widen when deploys are rarer. Requires --repo.
+      --fail-on-growth-percent <n>
+                          Exit 7 when a compared pattern's estimated bytes grow by more
+                          than n percent. Requires --snapshots. When --fail-on-growth-bytes
+                          is also set, both must be exceeded (a 2 KB pattern doubling is
+                          not a memory incident).
+      --fail-on-growth-bytes <n>
+                          Exit 7 when a compared pattern's estimated bytes grow by more
+                          than n bytes. Requires --snapshots. Combined with
+                          --fail-on-growth-percent as a pair; either flag alone trips on
+                          that number by itself.
+      --fail-on-ttl-drop <n>
+                          Exit 7 when a compared pattern's TTL coverage drops by more
+                          than n percentage points (20 means 90% → 70%). Requires
+                          --snapshots.
+      --fail-on-new-untimed-patterns
+                          Exit 7 when a pattern first appears with effectively no TTL.
+                          Requires --snapshots.
+      --warn-only         Report crossed thresholds but still exit 0. Requires --snapshots.
   -h, --help              Show this help.
   -V, --version           Show the version.
 

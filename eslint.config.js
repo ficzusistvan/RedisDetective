@@ -198,7 +198,7 @@ export default tseslint.config(
 
   // Developer scripts run under Node directly, outside any package.
   {
-    files: ['scripts/**/*.mjs', 'action/**/*.mjs', 'examples/**/*.mjs'],
+    files: ['scripts/**/*.mjs', 'action/**/*.mjs', 'examples/**/*.mjs', 'e2e/**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: {
       ecmaVersion: 2022,
@@ -209,6 +209,8 @@ export default tseslint.config(
         console: 'readonly',
         fetch: 'readonly',
         process: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
       },
     },
     rules: {

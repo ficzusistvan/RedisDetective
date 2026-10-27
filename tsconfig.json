@@ -6,6 +6,7 @@
     { "path": "./packages/evidence" },
     { "path": "./packages/github-integration" },
     { "path": "./packages/reasoner" },
+    { "path": "./packages/alerts" },
     { "path": "./packages/cli" }
   ]
 }

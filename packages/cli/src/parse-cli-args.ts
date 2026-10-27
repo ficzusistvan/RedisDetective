@@ -1,4 +1,11 @@
 import {
+  ALERT_ENV_VARS,
+  AlertConfigError,
+  isAlertSeverity,
+  parseAlertDurationMs,
+} from '@redis-detective/alerts';
+import type { AlertSeverity } from '@redis-detective/alerts';
+import {
   GITHUB_APP_ENV_VARS,
   GITHUB_PERSONAL_TOKEN_ENV_VARS,
 } from '@redis-detective/github-integration';
@@ -52,6 +59,17 @@ export interface CliOptions {
   readonly gateThresholds: CiGateThresholds;
   /** Crossed thresholds become warnings and the process still exits 0. */
   readonly warnOnly: boolean;
+  readonly alertSlackWebhook: string | null;
+  readonly alertWebhookUrl: string | null;
+  readonly alertWebhookSecret: string | null;
+  readonly alertPagerdutyRoutingKey: string | null;
+  readonly alertPagerdutyEventsUrl: string | null;
+  readonly alertCooldownMs: number | null;
+  readonly alertSeverity: AlertSeverity | null;
+  readonly alertPagerdutyMinSeverity: AlertSeverity | null;
+  readonly alertConfigPath: string | null;
+  readonly alertStateFile: string | null;
+  readonly alertDryRun: boolean;
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -86,6 +104,17 @@ interface MutableCliOptions {
     newUntimedPatterns: boolean;
   };
   warnOnly: boolean;
+  alertSlackWebhook: string | null;
+  alertWebhookUrl: string | null;
+  alertWebhookSecret: string | null;
+  alertPagerdutyRoutingKey: string | null;
+  alertPagerdutyEventsUrl: string | null;
+  alertCooldownMs: number | null;
+  alertSeverity: AlertSeverity | null;
+  alertPagerdutyMinSeverity: AlertSeverity | null;
+  alertConfigPath: string | null;
+  alertStateFile: string | null;
+  alertDryRun: boolean;
   help: boolean;
   version: boolean;
 }
@@ -213,6 +242,17 @@ export function parseCliArgs(
       newUntimedPatterns: false,
     },
     warnOnly: false,
+    alertSlackWebhook: null,
+    alertWebhookUrl: null,
+    alertWebhookSecret: null,
+    alertPagerdutyRoutingKey: null,
+    alertPagerdutyEventsUrl: null,
+    alertCooldownMs: null,
+    alertSeverity: null,
+    alertPagerdutyMinSeverity: null,
+    alertConfigPath: null,
+    alertStateFile: null,
+    alertDryRun: false,
     help: false,
     version: false,
   };
@@ -310,6 +350,80 @@ export function parseCliArgs(
         options.warnOnly = true;
         break;
 
+      case '--alert-slack-webhook': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertSlackWebhook = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-webhook-url': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertWebhookUrl = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-webhook-secret': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertWebhookSecret = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-pagerduty-routing-key': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertPagerdutyRoutingKey = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-pagerduty-events-url': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertPagerdutyEventsUrl = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-cooldown': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertCooldownMs = parseAlertCooldown(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-severity': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertSeverity = parseSeverityFlag(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-pagerduty-min-severity': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertPagerdutyMinSeverity = parseSeverityFlag(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-config': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertConfigPath = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-state-file': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.alertStateFile = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--alert-dry-run':
+        options.alertDryRun = true;
+        break;
+
       case '--redact-keys':
         options.redactKeys = true;
         break;
@@ -404,6 +518,8 @@ export function parseCliArgs(
     options.redisUrl = env['REDIS_URL'] ?? null;
   }
 
+  applyAlertEnvFallbacks(options, env);
+
   if (!options.skipGh) {
     const skipGh = env['REDIS_DETECTIVE_SKIP_GH']?.trim().toLowerCase();
     options.skipGh = skipGh === '1' || skipGh === 'true';
@@ -438,6 +554,70 @@ export function parseCliArgs(
  * `GITHUB_REPOSITORY` on every job; using it alone would turn a Redis diagnosis into a failed
  * GitHub auth. `gh auth token` is not checked here — parsing is sync.
  */
+function requireNonEmpty(flag: string, value: string): string {
+  if (value === '') {
+    throw new CliUsageError(`${flag} expects a value.`);
+  }
+  return value;
+}
+
+function parseAlertCooldown(flag: string, raw: string): number {
+  try {
+    return parseAlertDurationMs(raw, flag);
+  } catch (error) {
+    if (error instanceof AlertConfigError) {
+      throw new CliUsageError(error.message);
+    }
+    throw error;
+  }
+}
+
+function parseSeverityFlag(flag: string, raw: string): AlertSeverity {
+  if (!isAlertSeverity(raw)) {
+    throw new CliUsageError(`${flag} expects info, warning, or critical, received "${raw}".`);
+  }
+  return raw;
+}
+
+function firstEnv(env: Readonly<Record<string, string | undefined>>, name: string): string | null {
+  const value = env[name]?.trim();
+  return value === undefined || value === '' ? null : value;
+}
+
+function applyAlertEnvFallbacks(
+  options: MutableCliOptions,
+  env: Readonly<Record<string, string | undefined>>,
+): void {
+  options.alertSlackWebhook ??= firstEnv(env, ALERT_ENV_VARS.slackWebhook);
+  options.alertWebhookUrl ??= firstEnv(env, ALERT_ENV_VARS.webhookUrl);
+  options.alertWebhookSecret ??= firstEnv(env, ALERT_ENV_VARS.webhookSecret);
+  options.alertPagerdutyRoutingKey ??= firstEnv(env, ALERT_ENV_VARS.pagerdutyRoutingKey);
+  options.alertPagerdutyEventsUrl ??= firstEnv(env, ALERT_ENV_VARS.pagerdutyEventsUrl);
+  options.alertConfigPath ??= firstEnv(env, ALERT_ENV_VARS.config);
+
+  if (options.alertCooldownMs === null) {
+    const raw = firstEnv(env, ALERT_ENV_VARS.cooldown);
+    if (raw !== null) {
+      options.alertCooldownMs = parseAlertCooldown(`$${ALERT_ENV_VARS.cooldown}`, raw);
+    }
+  }
+  if (options.alertSeverity === null) {
+    const raw = firstEnv(env, ALERT_ENV_VARS.severity);
+    if (raw !== null) {
+      options.alertSeverity = parseSeverityFlag(`$${ALERT_ENV_VARS.severity}`, raw);
+    }
+  }
+  if (options.alertPagerdutyMinSeverity === null) {
+    const raw = firstEnv(env, ALERT_ENV_VARS.pagerdutyMinSeverity);
+    if (raw !== null) {
+      options.alertPagerdutyMinSeverity = parseSeverityFlag(
+        `$${ALERT_ENV_VARS.pagerdutyMinSeverity}`,
+        raw,
+      );
+    }
+  }
+}
+
 function repositoryFallbackFromEnv(
   env: Readonly<Record<string, string | undefined>>,
 ): string | null {

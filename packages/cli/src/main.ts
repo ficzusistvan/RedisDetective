@@ -1,3 +1,11 @@
+import {
+  createAlertFetch,
+  createFileAlertStateStore,
+  createNotifiers,
+  hasAlertChannels,
+  processAlertTick,
+} from '@redis-detective/alerts';
+import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
 import { NotImplementedError } from '@redis-detective/core-types';
 import {
   FindCandidateCommitsError,
@@ -25,14 +33,18 @@ import type { RedisConnection } from './create-redis-client.js';
 import { createGitHubCommitSource } from './create-github-commit-source.js';
 import type { ReadGhAuthToken } from './create-github-commit-source.js';
 import { createLlmClientFromEnv } from './create-llm-client-from-env.js';
+import { evaluateAlertRules } from './evaluate-alert-rules.js';
 import { evaluateCiGate, hasCiGateThresholds } from './evaluate-ci-gate.js';
 import type { CiGateResult } from './evaluate-ci-gate.js';
 import { EXIT_CODES } from './exit-codes.js';
 import type { ExitCode } from './exit-codes.js';
+import { formatWatchAlertBanner } from './format-watch-alert-banner.js';
 import { CliUsageError, parseCliArgs } from './parse-cli-args.js';
 import type { CliOptions } from './parse-cli-args.js';
 import { StoredSnapshotError } from './parse-stored-snapshot.js';
 import { redactRedisUrl } from './redact-redis-url.js';
+import { resolveAlertConfig } from './resolve-alert-config.js';
+import { runTestAlert } from './run-test-alert.js';
 import { renderJsonDiagnosis } from './render-json-diagnosis.js';
 import { renderJsonReport } from './render-json-report.js';
 import { renderMarkdownDiagnosis } from './render-markdown-diagnosis.js';
@@ -112,6 +124,13 @@ export interface MainContext {
   readonly stopSignal?: AbortSignal;
   /** Injected so `watch` can be exercised without real timers. Production waits on the clock. */
   readonly watchDeps?: WatchDeps;
+  /**
+   * Injected so alerts never reach Slack / PagerDuty from a unit test. Production wraps
+   * `globalThis.fetch`.
+   */
+  readonly alertFetch?: AlertFetch;
+  readonly alertWait?: AlertWait;
+  readonly openAlertStateStore?: (path: string) => AlertStateStore;
 }
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
@@ -155,6 +174,10 @@ export async function main(context: MainContext): Promise<ExitCode> {
 
   if (options.command === 'watch') {
     return runWatchCommand(context, options);
+  }
+
+  if (options.command === 'test-alert') {
+    return runTestAlertCommand(context, options);
   }
 
   if (gateFlagsRequireSnapshots(options) && options.snapshotDirectory === null) {
@@ -277,9 +300,15 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     );
     return EXIT_CODES.usageError;
   }
-  if (options.writeJsonPath !== null || gateFlagsRequireSnapshots(options)) {
+  if (options.writeJsonPath !== null) {
     streams.writeError(
-      `watch does not evaluate a CI gate. Run ${CLI_NAME} --snapshots ${snapshotDirectory} with the gate flags for a one-shot comparison.\n`,
+      `watch prints one line per sample, so --write-json does not apply. Run ${CLI_NAME} --snapshots ${snapshotDirectory} --write-json <file> for a one-shot diagnosis.\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+  if (options.warnOnly) {
+    streams.writeError(
+      `watch does not take --warn-only. Use --alert-severity and channel routing instead.\n`,
     );
     return EXIT_CODES.usageError;
   }
@@ -290,6 +319,33 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
   if (connected.ok === false) {
     return connected.exitCode;
   }
+
+  let alertSetup: ReturnType<typeof resolveAlertConfig>;
+  try {
+    alertSetup = resolveAlertConfig({
+      options,
+      env: context.env,
+      snapshotDirectory,
+    });
+  } catch (error) {
+    if (error instanceof CliUsageError) {
+      streams.writeError(`${error.message}\n`);
+      return EXIT_CODES.usageError;
+    }
+    throw error;
+  }
+
+  const alertConfig = alertSetup.config;
+  const alertFetch =
+    context.alertFetch ?? createAlertFetch((url, init) => globalThis.fetch(url, init));
+  const openAlertStore = context.openAlertStateStore ?? createFileAlertStateStore;
+  const alertStateStore =
+    alertConfig.stateFile === null ? null : openAlertStore(alertConfig.stateFile);
+  const notifiers = createNotifiers({
+    config: alertConfig,
+    fetchImpl: alertFetch,
+    ...(context.alertWait === undefined ? {} : { wait: context.alertWait }),
+  });
 
   try {
     await runWatch(
@@ -309,6 +365,48 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
         writeLine: (line) => {
           streams.writeOut(`${line}\n`);
         },
+        extraOpeningLines: formatWatchAlertBanner(alertConfig, alertSetup.configPath),
+        afterTick: async (report) => {
+          if (alertConfig.rules.length === 0) {
+            return;
+          }
+          if (alertStateStore === null) {
+            return;
+          }
+          try {
+            await processAlertTick({
+              host: report.target ?? target,
+              occurredAt: report.generatedAt,
+              nowMs: Date.parse(report.generatedAt),
+              cooldownMs: alertConfig.cooldownMs,
+              context: {
+                host: report.target ?? target,
+                likelyCause:
+                  report.explanation.likelyCause === null
+                    ? null
+                    : {
+                        pattern: report.explanation.likelyCause.pattern,
+                        description: report.explanation.likelyCause.description,
+                      },
+                commitHints: report.commitCandidates.map((candidate) => ({
+                  sha: candidate.sha,
+                  shortSha: candidate.shortSha,
+                  message: candidate.message.split('\n')[0] ?? candidate.message,
+                })),
+              },
+              rules: evaluateAlertRules(report.snapshots, alertConfig.rules),
+              store: alertStateStore,
+              notifiers,
+              writeLine: (line) => {
+                streams.writeOut(`${line}\n`);
+              },
+            });
+          } catch (error) {
+            streams.writeError(
+              `alert tick failed; watch continues. ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          }
+        },
       },
       context.watchDeps,
     );
@@ -317,6 +415,58 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     return reportCaughtError(streams, error);
   } finally {
     await connected.connection.close();
+  }
+}
+
+async function runTestAlertCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {
+  const { streams } = context;
+  if (options.outputFormat !== 'text') {
+    streams.writeError(
+      `test-alert prints a short confirmation per channel, so --format / --json do not apply.\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+
+  let alertSetup: ReturnType<typeof resolveAlertConfig>;
+  try {
+    alertSetup = resolveAlertConfig({ options, env: context.env });
+  } catch (error) {
+    if (error instanceof CliUsageError) {
+      streams.writeError(`${error.message}\n`);
+      return EXIT_CODES.usageError;
+    }
+    throw error;
+  }
+
+  if (!hasAlertChannels(alertSetup.config.channels)) {
+    streams.writeError(
+      `test-alert needs at least one channel. Pass --alert-slack-webhook, --alert-webhook-url, or --alert-pagerduty-routing-key (or set the matching REDIS_DETECTIVE_* env vars).\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+
+  const host =
+    options.redisUrl === null ? 'redis://<redacted-host>' : redactRedisUrl(options.redisUrl);
+  const alertFetch =
+    context.alertFetch ?? createAlertFetch((url, init) => globalThis.fetch(url, init));
+
+  try {
+    const result = await runTestAlert({
+      config: alertSetup.config,
+      host,
+      fetchImpl: alertFetch,
+      ...(context.alertWait === undefined ? {} : { wait: context.alertWait }),
+      writeLine: (line) => {
+        streams.writeOut(`${line}\n`);
+      },
+      writeError: (line) => {
+        streams.writeError(line);
+      },
+    });
+    return result.failed > 0 ? EXIT_CODES.unexpectedError : EXIT_CODES.ok;
+  } catch (error) {
+    streams.writeError(`${error instanceof Error ? error.message : String(error)}\n`);
+    return EXIT_CODES.usageError;
   }
 }
 

@@ -27,6 +27,8 @@ Usage
   ${CLI_NAME} --snapshots ./snaps --fail-on-ttl-drop 20 --fail-on-growth-percent 25
   ${CLI_NAME} --snapshots ./snaps --repo owner/repo
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --interval 15m
+  ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --fail-on-ttl-drop 20 --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
+  ${CLI_NAME} test-alert --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
 
 Commands
   (none)                  Sample once, and with --snapshots diagnose growth against the samples
@@ -41,6 +43,13 @@ Commands
                           --repo, so a session makes no GitHub requests. Run the plain command
                           afterwards on the same --snapshots directory for the full diagnosis
                           and for candidate commits.
+                          When --fail-on-* (or an alert config file) is set, each tick reuses
+                          the same threshold comparison as the CI gate. A breach notifies the
+                          configured channels once, then stays quiet until --alert-cooldown
+                          elapses or the condition clears (resolve).
+  test-alert              Send one sample notification per configured channel, so a webhook
+  alerts test             can be verified without waiting for a real breach. Same flags as
+                          watch for channels. Does not sample Redis.
 
 Options
   -u, --url <url>         Redis connection URL. Defaults to $REDIS_URL.
@@ -106,6 +115,42 @@ Options
                           Exit 7 when a pattern first appears with effectively no TTL.
                           Requires --snapshots.
       --warn-only         Report crossed thresholds but still exit 0. Requires --snapshots.
+                          Not used by watch (alerts have their own severity).
+      --alert-slack-webhook <url>
+                          Slack incoming webhook. Env: REDIS_DETECTIVE_SLACK_WEBHOOK.
+      --alert-webhook-url <url>
+                          Generic webhook. POST a versioned JSON payload (schemaVersion 1).
+                          Env: REDIS_DETECTIVE_WEBHOOK_URL.
+      --alert-webhook-secret <secret>
+                          HMAC-SHA256 of the generic webhook body, sent as
+                          X-Redis-Detective-Signature: sha256=<hex>.
+                          Env: REDIS_DETECTIVE_WEBHOOK_SECRET.
+      --alert-pagerduty-routing-key <key>
+                          PagerDuty Events API v2 routing key. Env:
+                          REDIS_DETECTIVE_PAGERDUTY_ROUTING_KEY. By default only critical
+                          rules are sent (see --alert-pagerduty-min-severity).
+      --alert-severity <level>
+                          Severity of the implicit CLI rule built from --fail-on-*
+                          (info, warning, critical). Default warning. File rules set their
+                          own. Env: REDIS_DETECTIVE_ALERT_SEVERITY.
+      --alert-pagerduty-min-severity <level>
+                          Lowest severity that pages. Default critical.
+                          Env: REDIS_DETECTIVE_PAGERDUTY_MIN_SEVERITY.
+      --alert-cooldown <dur>
+                          Re-notify interval for a persistent breach (45s, 15m, 2h, or
+                          seconds). Default 1h. 0 disables the cooldown.
+                          Env: REDIS_DETECTIVE_ALERT_COOLDOWN.
+      --alert-config <file>
+                          JSON or YAML rules file (.redis-detective.json / .yaml).
+                          Env: REDIS_DETECTIVE_ALERT_CONFIG. Searched in the current
+                          directory when omitted.
+      --alert-state-file <file>
+                          Where watch persists firing/resolved state so a restart does
+                          not re-page. Default: <snapshots>/.redis-detective-alerts.json.
+      --alert-dry-run     Print alert payloads instead of sending them.
+      --alert-pagerduty-events-url <url>
+                          Override the PagerDuty Events API URL (tests / mock servers).
+                          Env: REDIS_DETECTIVE_PAGERDUTY_EVENTS_URL.
   -h, --help              Show this help.
   -V, --version           Show the version.
 

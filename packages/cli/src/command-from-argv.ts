@@ -1,5 +1,5 @@
 /** Which command the user invoked. `report` is the default when no subcommand is given. */
-export type CliCommand = 'report' | 'watch';
+export type CliCommand = 'report' | 'watch' | 'test-alert';
 
 export interface ParsedCommand {
   readonly command: CliCommand;
@@ -13,12 +13,24 @@ export interface ParsedCommand {
  * Recognised in first position only. A `watch` that turns up after the flags is a typo worth
  * reporting as an unexpected argument rather than a mode to guess at.
  *
+ * `test-alert` and `alerts test` are the same command: send one sample notification per
+ * configured channel.
+ *
  * Exported because `bin.ts` needs the same answer before `main` parses anything: it installs the
  * interrupt handlers only for `watch`, so Ctrl-C keeps killing a one-shot run immediately.
  */
 export function commandFromArgv(argv: readonly string[]): ParsedCommand {
   if (argv[0] === 'watch') {
     return { command: 'watch', flags: argv.slice(1) };
+  }
+  if (argv[0] === 'test-alert') {
+    return { command: 'test-alert', flags: argv.slice(1) };
+  }
+  if (argv[0] === 'alerts') {
+    if (argv[1] === 'test') {
+      return { command: 'test-alert', flags: argv.slice(2) };
+    }
+    return { command: 'test-alert', flags: argv.slice(1) };
   }
   return { command: 'report', flags: argv };
 }

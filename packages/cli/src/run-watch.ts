@@ -1,6 +1,7 @@
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
 import { CLI_NAME } from './cli-usage.js';
+import type { DiagnosisReport } from './diagnosis-report.js';
 import { formatDuration } from './format-bytes.js';
 import { formatWatchTick } from './format-watch-tick.js';
 import { runDiagnosis } from './run-diagnosis.js';
@@ -52,6 +53,13 @@ export interface RunWatchRequest {
    */
   readonly stopSignal: AbortSignal;
   readonly writeLine: (line: string) => void;
+  /**
+   * Optional hook after each saved sample. Alerts run here so a notifier failure cannot
+   * skip the snapshot that was just written. Must not throw.
+   */
+  readonly afterTick?: (report: DiagnosisReport) => Promise<void>;
+  /** Extra lines after the standard "Watching …" banner (alert channel summary). */
+  readonly extraOpeningLines?: readonly string[];
 }
 
 export interface WatchSummary {
@@ -74,6 +82,9 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     lines.push(
       `Candidate commits are not looked up while watching, so a long session makes no GitHub requests. Run ${diagnosisCommand(request)} afterwards for those.`,
     );
+  }
+  if (request.extraOpeningLines !== undefined) {
+    lines.push(...request.extraOpeningLines);
   }
   return lines;
 }
@@ -149,6 +160,14 @@ export async function runWatch(
         causePattern: report.explanation.likelyCause?.pattern ?? null,
       }),
     );
+
+    if (request.afterTick !== undefined) {
+      try {
+        await request.afterTick(report);
+      } catch {
+        writeLine('alert tick failed; watch continues.');
+      }
+    }
 
     if (stopSignal.aborted) {
       break;

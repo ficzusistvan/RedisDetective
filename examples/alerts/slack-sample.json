@@ -1,0 +1,55 @@
+{
+  "text": "Redis Detective: session:* TTL coverage drop firing on redis://:***@cache.internal:6379/",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "Redis memory alert",
+        "emoji": false
+      }
+    },
+    {
+      "type": "section",
+      "fields": [
+        {
+          "type": "mrkdwn",
+          "text": "*Pattern*\n`session:*`"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*What changed*\nTTL coverage drop"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Detail*\n96.0% → 4.0% (drop 92.0 points)"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Severity*\ncritical"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*TTL coverage*\n96.0% → 4.0%"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Likely cause (Redis-side)*\nsession:*: TTLs disappeared on session:*"
+        },
+        {
+          "type": "mrkdwn",
+          "text": "*Commit hints (not causes)*\n`a1b2c3d` drop EX on session write path"
+        }
+      ]
+    },
+    {
+      "type": "context",
+      "elements": [
+        {
+          "type": "mrkdwn",
+          "text": "Host: `redis://:***@cache.internal:6379/` · rule `ttl-drop` · firing · figures are estimates"
+        }
+      ]
+    }
+  ]
+}

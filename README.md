@@ -24,6 +24,43 @@ redis-detective --url redis://localhost:6379
 replaces example key names (they often embed user ids) so you can share the output. Prefer a
 replica, or a Redis user with a read-only ACL. Run `redis-detective --help` for the rest.
 
+## Programmatic API
+
+`redis-detective` is an ESM library as well as a CLI. Install it and call the engine in-process —
+the same sampling bounds, and the same objects `--json` prints. It does not write to stdout, does
+not load `.env`, and does not read `LLM_API_KEY`.
+
+```bash
+npm install redis-detective
+```
+
+```ts
+import { loadSnapshots, runDiagnosis, runHealthCheck, saveSnapshot } from 'redis-detective';
+
+const health = await runHealthCheck({
+  url: 'redis://localhost:6379',
+  redactKeys: true, // optional; also sampleSize, timeoutMs, memorySamples, databases
+});
+
+await saveSnapshot({ url: 'redis://localhost:6379', directory: './snaps' });
+const snapshots = await loadSnapshots('./snaps');
+
+const diagnosis = await runDiagnosis({
+  directory: './snaps',
+  url: 'redis://localhost:6379', // omit to diagnose stored files only
+  // repository: 'owner/repo', githubToken: '...',  // optional; never read from the environment
+  // llm: { apiKey: '...' },                       // optional rewording; omit for the template
+});
+```
+
+`runHealthCheck` returns a `HealthCheckJson`; `runDiagnosis` returns a `DiagnosisJson`. Both match
+the CLI `--json` payload (`schemaVersion`, findings / graph / explanation). Sampling flags are
+clamped to the same safe ceilings as the CLI. Connection failures throw `RedisConnectionError`;
+unreadable snapshot files throw `StoredSnapshotError`.
+
+The `redis-detective` binary is unchanged: `npx redis-detective`, `watch`, `--json`, and `--repo`
+keep working as before.
+
 ## What is using memory now
 
 One run reports the patterns holding memory, which of them have little or no TTL coverage,

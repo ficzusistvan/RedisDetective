@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import type { RedisSnapshot } from '@redis-detective/core-types';
 
 import { SNAPSHOT_FILE_SCHEMA_VERSION, parseStoredSnapshot } from './parse-stored-snapshot.js';
-import { StoredSnapshotError } from './parse-stored-snapshot.js';
+import { StoredSnapshotError } from './stored-snapshot-error.js';
 import { serializeSnapshot } from './serialize-snapshot.js';
 
 export interface StoredSnapshot {
@@ -76,7 +76,10 @@ export function createFileSnapshotStore(directory: string): SnapshotStore {
         }
 
         const location = join(directory, name);
-        stored.push({ location, snapshot: parseStoredSnapshot(await readJson(location), location) });
+        stored.push({
+          location,
+          snapshot: parseStoredSnapshot(await readJson(location), location),
+        });
       }
 
       return stored;
@@ -85,7 +88,10 @@ export function createFileSnapshotStore(directory: string): SnapshotStore {
     async save(snapshot: RedisSnapshot): Promise<string> {
       await mkdir(directory, { recursive: true });
       const location = join(directory, snapshotFileName(snapshot));
-      const contents = { schemaVersion: SNAPSHOT_FILE_SCHEMA_VERSION, snapshot: serializeSnapshot(snapshot) };
+      const contents = {
+        schemaVersion: SNAPSHOT_FILE_SCHEMA_VERSION,
+        snapshot: serializeSnapshot(snapshot),
+      };
       await writeFile(location, `${JSON.stringify(contents, null, 2)}\n`, 'utf8');
       return location;
     },
@@ -133,9 +139,7 @@ export function createMemorySnapshotStore(
 }
 
 function isMissingDirectory(error: unknown): boolean {
-  return (
-    error instanceof Error && (error as { code?: unknown }).code === 'ENOENT'
-  );
+  return error instanceof Error && (error as { code?: unknown }).code === 'ENOENT';
 }
 
 async function readJson(location: string): Promise<unknown> {

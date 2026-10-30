@@ -1,6 +1,6 @@
 {
   "name": "@redis-detective/monorepo",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "license": "FSL-1.1-Apache-2.0",
   "private": true,
   "description": "Diagnoses why a Redis instance's memory grew, attributing the cause to a key pattern and the commit that introduced it.",

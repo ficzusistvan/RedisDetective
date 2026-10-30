@@ -8,12 +8,12 @@ import type { LlmClient } from '@redis-detective/reasoner';
 
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
 import { createRedisClient } from './create-redis-client.js';
-import { toDiagnosisJson } from './diagnosis-json.js';
 import type { DiagnosisJson } from './diagnosis-json.js';
+import { toDiagnosisJson } from './diagnosis-json.js';
+import type { DiagnosisOptions } from './diagnosis-options.js';
 import type { LibraryEngineDeps } from './library-engine-deps.js';
 import type { LibraryLlmOptions } from './library-llm-options.js';
 import { llmClientFromLibraryOptions } from './library-llm-options.js';
-import type { LibrarySamplingOptions } from './library-sampling-options.js';
 import { capturedSamplingFields } from './library-sampling-options.js';
 import { redactRedisUrl } from './redact-redis-url.js';
 import { runDiagnosis } from './run-diagnosis.js';
@@ -22,32 +22,7 @@ import { createFileSnapshotStore } from './snapshot-store.js';
 import { DEFAULT_CONNECT_TIMEOUT_MS } from './with-redis-connection.js';
 
 export type { LibraryLlmOptions } from './library-llm-options.js';
-
-export interface LibraryDiagnosisOptions extends LibrarySamplingOptions {
-  /** Directory of `*.snapshot.json` files — the same path `--snapshots` takes. */
-  readonly directory: string;
-  /**
-   * When set, this run samples live Redis, saves the snapshot, then diffs. When omitted, the
-   * directory is read as-is and no Redis connection is opened.
-   */
-  readonly url?: string;
-  /** ISO-8601 UTC. Defaults to now. Pass a fixed value to make tests reproducible. */
-  readonly generatedAt?: string;
-  /**
-   * `owner/repo` to search for candidate commits. Omit to skip GitHub entirely. The library
-   * never reads `GITHUB_TOKEN` or App env vars — pass `githubToken` alongside this.
-   */
-  readonly repository?: string;
-  /** Personal access token used only when `repository` is set. Never read from the environment. */
-  readonly githubToken?: string;
-  /** Hours before the growth window to search. Defaults to seven days. */
-  readonly lookbackHours?: number;
-  /**
-   * Explicit LLM rewording. Omit for the deterministic paragraph. The library never reads
-   * `LLM_API_KEY`.
-   */
-  readonly llm?: LibraryLlmOptions;
-}
+export type { DiagnosisOptions as LibraryDiagnosisOptions } from './diagnosis-options.js';
 
 /**
  * Diffs stored snapshots into a diagnosis, optionally sampling live Redis first.
@@ -57,7 +32,7 @@ export interface LibraryDiagnosisOptions extends LibrarySamplingOptions {
  * environment.
  */
 export async function runLibraryDiagnosis(
-  options: LibraryDiagnosisOptions,
+  options: DiagnosisOptions,
   deps: LibraryEngineDeps = {},
 ): Promise<DiagnosisJson> {
   const generatedAt = options.generatedAt ?? (deps.now ?? (() => new Date()))().toISOString();
@@ -111,7 +86,7 @@ function resolveLlmClient(
 }
 
 function resolveGitHub(
-  options: LibraryDiagnosisOptions,
+  options: DiagnosisOptions,
   deps: LibraryEngineDeps,
 ): {
   readonly repository: GitHubRepositoryRef | null;

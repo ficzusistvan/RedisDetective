@@ -1,23 +1,15 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
-
 import { captureSnapshot } from './capture-snapshot.js';
 import type { LibraryEngineDeps } from './library-engine-deps.js';
-import type { LibrarySamplingOptions } from './library-sampling-options.js';
 import { capturedSamplingFields } from './library-sampling-options.js';
+import type { SaveSnapshotOptions, SavedSnapshot } from './save-snapshot-options.js';
 import { serializeSnapshot } from './serialize-snapshot.js';
 import { createFileSnapshotStore } from './snapshot-store.js';
 import { withRedisConnection } from './with-redis-connection.js';
 
-export interface LibrarySaveSnapshotOptions extends LibrarySamplingOptions {
-  readonly url: string;
-  /** Directory of `*.snapshot.json` files — the same path `--snapshots` takes. */
-  readonly directory: string;
-}
-
-export interface SavedSnapshot {
-  readonly location: string;
-  readonly snapshot: RedisSnapshot;
-}
+export type {
+  SaveSnapshotOptions as LibrarySaveSnapshotOptions,
+  SavedSnapshot,
+} from './save-snapshot-options.js';
 
 /**
  * Samples the instance once and writes a snapshot file into `directory`.
@@ -25,7 +17,7 @@ export interface SavedSnapshot {
  * Creates the directory if it does not exist. Does not diagnose growth and does not print.
  */
 export async function saveLibrarySnapshot(
-  options: LibrarySaveSnapshotOptions,
+  options: SaveSnapshotOptions,
   deps: LibraryEngineDeps = {},
 ): Promise<SavedSnapshot> {
   const sampling = capturedSamplingFields(options);

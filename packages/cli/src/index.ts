@@ -28,7 +28,8 @@ export {
   formatPercent,
 } from './format-bytes.js';
 
-export { RedisConnectionError, createRedisClient } from './create-redis-client.js';
+export { RedisConnectionError } from './redis-connection-error.js';
+export { createRedisClient } from './create-redis-client.js';
 export type { RedisConnection } from './create-redis-client.js';
 
 export { HEALTH_FINDING_KINDS } from './health-check-report.js';
@@ -61,11 +62,8 @@ export { createLlmClientFromEnv } from './create-llm-client-from-env.js';
 export { EVIDENCE_VOCABULARY, STRENGTH_LABEL } from './evidence-vocabulary.js';
 export type { EvidencePhrase } from './evidence-vocabulary.js';
 
-export {
-  SNAPSHOT_FILE_SCHEMA_VERSION,
-  StoredSnapshotError,
-  parseStoredSnapshot,
-} from './parse-stored-snapshot.js';
+export { SNAPSHOT_FILE_SCHEMA_VERSION, parseStoredSnapshot } from './parse-stored-snapshot.js';
+export { StoredSnapshotError } from './stored-snapshot-error.js';
 
 export {
   createFileSnapshotStore,
@@ -106,16 +104,27 @@ export type {
 } from './diagnosis-json.js';
 
 export { runLibraryHealthCheck } from './run-library-health-check.js';
-export type { LibraryHealthCheckOptions } from './run-library-health-check.js';
+export type {
+  HealthCheckOptions,
+  HealthCheckOptions as LibraryHealthCheckOptions,
+} from './health-check-options.js';
 
 export { saveLibrarySnapshot } from './save-library-snapshot.js';
-export type { LibrarySaveSnapshotOptions, SavedSnapshot } from './save-library-snapshot.js';
+export type {
+  SaveSnapshotOptions,
+  SaveSnapshotOptions as LibrarySaveSnapshotOptions,
+  SavedSnapshot,
+} from './save-snapshot-options.js';
 
 export { loadLibrarySnapshots } from './load-library-snapshots.js';
-export type { LoadedSnapshot } from './load-library-snapshots.js';
+export type { LoadedSnapshot } from './loaded-snapshot.js';
 
 export { runLibraryDiagnosis } from './run-library-diagnosis.js';
-export type { LibraryDiagnosisOptions, LibraryLlmOptions } from './run-library-diagnosis.js';
+export type {
+  DiagnosisOptions,
+  DiagnosisOptions as LibraryDiagnosisOptions,
+} from './diagnosis-options.js';
+export type { LibraryLlmOptions } from './library-llm-options.js';
 
 export type { LibrarySamplingOptions } from './library-sampling-options.js';
 export type { LibraryEngineDeps } from './library-engine-deps.js';

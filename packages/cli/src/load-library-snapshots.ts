@@ -1,12 +1,8 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
-
+import type { LoadedSnapshot } from './loaded-snapshot.js';
 import { serializeSnapshot } from './serialize-snapshot.js';
 import { createFileSnapshotStore } from './snapshot-store.js';
 
-export interface LoadedSnapshot {
-  readonly location: string;
-  readonly snapshot: RedisSnapshot;
-}
+export type { LoadedSnapshot } from './loaded-snapshot.js';
 
 /**
  * Reads every `*.snapshot.json` in `directory`, oldest first.

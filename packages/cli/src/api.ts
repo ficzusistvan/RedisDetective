@@ -7,18 +7,13 @@
  * contract.
  *
  * This module does not load `.env`, does not read `LLM_API_KEY`, and does not write to stdout.
+ * Wrappers here take options only: test-only `deps` seams on the `runLibrary*` functions are
+ * not part of the published signatures.
  */
 
-export { GitHubRepositoryRefError } from '@redis-detective/github-integration';
+import { GitHubRepositoryRefError } from '@redis-detective/github-integration';
 
-export { RedisConnectionError } from './create-redis-client.js';
-export { StoredSnapshotError } from './parse-stored-snapshot.js';
-
-export { JSON_REPORT_SCHEMA_VERSION } from './health-check-json.js';
-export type { HealthCheckJson, HealthCheckJsonFinding } from './health-check-json.js';
-
-export { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from './diagnosis-json.js';
-export type {
+import type {
   DiagnosisJson,
   DiagnosisJsonAnomaly,
   DiagnosisJsonAttribution,
@@ -27,23 +22,62 @@ export type {
   DiagnosisJsonGraph,
   DiagnosisJsonTtlDrift,
 } from './diagnosis-json.js';
+import { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from './diagnosis-json.js';
+import type { DiagnosisOptions } from './diagnosis-options.js';
+import type { HealthCheckJson, HealthCheckJsonFinding } from './health-check-json.js';
+import { JSON_REPORT_SCHEMA_VERSION } from './health-check-json.js';
+import type { HealthCheckOptions } from './health-check-options.js';
+import type { LibraryLlmOptions } from './library-llm-options.js';
+import type { LibrarySamplingOptions } from './library-sampling-options.js';
+import type { LoadedSnapshot } from './loaded-snapshot.js';
+import { loadLibrarySnapshots } from './load-library-snapshots.js';
+import { RedisConnectionError } from './redis-connection-error.js';
+import { runLibraryDiagnosis } from './run-library-diagnosis.js';
+import { runLibraryHealthCheck } from './run-library-health-check.js';
+import type { SaveSnapshotOptions, SavedSnapshot } from './save-snapshot-options.js';
+import { saveLibrarySnapshot } from './save-library-snapshot.js';
+import { StoredSnapshotError } from './stored-snapshot-error.js';
 
-export { runLibraryHealthCheck as runHealthCheck } from './run-library-health-check.js';
-export type { LibraryHealthCheckOptions as HealthCheckOptions } from './run-library-health-check.js';
+export {
+  DIAGNOSIS_REPORT_SCHEMA_VERSION,
+  DIAGNOSIS_REPORT_TYPE,
+  GitHubRepositoryRefError,
+  JSON_REPORT_SCHEMA_VERSION,
+  RedisConnectionError,
+  StoredSnapshotError,
+};
 
-export { saveLibrarySnapshot as saveSnapshot } from './save-library-snapshot.js';
 export type {
-  LibrarySaveSnapshotOptions as SaveSnapshotOptions,
-  SavedSnapshot,
-} from './save-library-snapshot.js';
-
-export { loadLibrarySnapshots as loadSnapshots } from './load-library-snapshots.js';
-export type { LoadedSnapshot } from './load-library-snapshots.js';
-
-export { runLibraryDiagnosis as runDiagnosis } from './run-library-diagnosis.js';
-export type {
-  LibraryDiagnosisOptions as DiagnosisOptions,
+  DiagnosisJson,
+  DiagnosisJsonAnomaly,
+  DiagnosisJsonAttribution,
+  DiagnosisJsonCommitCandidate,
+  DiagnosisJsonExplanation,
+  DiagnosisJsonGraph,
+  DiagnosisJsonTtlDrift,
+  DiagnosisOptions,
+  HealthCheckJson,
+  HealthCheckJsonFinding,
+  HealthCheckOptions,
   LibraryLlmOptions,
-} from './run-library-diagnosis.js';
+  LibrarySamplingOptions,
+  LoadedSnapshot,
+  SaveSnapshotOptions,
+  SavedSnapshot,
+};
 
-export type { LibrarySamplingOptions } from './library-sampling-options.js';
+export async function runHealthCheck(options: HealthCheckOptions): Promise<HealthCheckJson> {
+  return runLibraryHealthCheck(options);
+}
+
+export async function saveSnapshot(options: SaveSnapshotOptions): Promise<SavedSnapshot> {
+  return saveLibrarySnapshot(options);
+}
+
+export async function loadSnapshots(directory: string): Promise<readonly LoadedSnapshot[]> {
+  return loadLibrarySnapshots(directory);
+}
+
+export async function runDiagnosis(options: DiagnosisOptions): Promise<DiagnosisJson> {
+  return runLibraryDiagnosis(options);
+}

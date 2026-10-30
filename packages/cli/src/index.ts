@@ -91,6 +91,35 @@ export type { RunHealthCheckRequest } from './run-health-check.js';
 export { runDiagnosis } from './run-diagnosis.js';
 export type { RunDiagnosisRequest } from './run-diagnosis.js';
 
+export { toHealthCheckJson } from './health-check-json.js';
+export type { HealthCheckJson, HealthCheckJsonFinding } from './health-check-json.js';
+
+export { toDiagnosisJson } from './diagnosis-json.js';
+export type {
+  DiagnosisJson,
+  DiagnosisJsonAnomaly,
+  DiagnosisJsonAttribution,
+  DiagnosisJsonCommitCandidate,
+  DiagnosisJsonExplanation,
+  DiagnosisJsonGraph,
+  DiagnosisJsonTtlDrift,
+} from './diagnosis-json.js';
+
+export { runLibraryHealthCheck } from './run-library-health-check.js';
+export type { LibraryHealthCheckOptions } from './run-library-health-check.js';
+
+export { saveLibrarySnapshot } from './save-library-snapshot.js';
+export type { LibrarySaveSnapshotOptions, SavedSnapshot } from './save-library-snapshot.js';
+
+export { loadLibrarySnapshots } from './load-library-snapshots.js';
+export type { LoadedSnapshot } from './load-library-snapshots.js';
+
+export { runLibraryDiagnosis } from './run-library-diagnosis.js';
+export type { LibraryDiagnosisOptions, LibraryLlmOptions } from './run-library-diagnosis.js';
+
+export type { LibrarySamplingOptions } from './library-sampling-options.js';
+export type { LibraryEngineDeps } from './library-engine-deps.js';
+
 export { DEFAULT_WATCH_INTERVAL_MS, MIN_WATCH_INTERVAL_MS } from './watch-defaults.js';
 export { DEFAULT_WATCH_DEPS, runWatch } from './run-watch.js';
 export type { RunWatchRequest, WatchDeps, WatchSummary } from './run-watch.js';

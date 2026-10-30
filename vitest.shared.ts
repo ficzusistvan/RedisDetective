@@ -22,6 +22,8 @@ export default defineConfig({
       '@redis-detective/reasoner': packageEntry('reasoner'),
       '@redis-detective/alerts': packageEntry('alerts'),
       '@redis-detective/cli': packageEntry('cli'),
+      // Consumer specifier for the published API (packages/cli/src/api.ts).
+      'redis-detective': packageEntry('cli', 'api'),
     },
   },
   test: {

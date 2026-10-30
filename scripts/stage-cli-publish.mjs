@@ -32,6 +32,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as esbuild from 'esbuild';
 
 import { bundleLibraryDts } from './bundle-library-dts.mjs';
+import { testPublishedApi } from './test-published-api.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 const cliDir = join(repoRoot, 'packages', 'cli');
@@ -170,6 +171,7 @@ copyFileSync(join(repoRoot, 'LICENSE'), join(outDir, 'LICENSE'));
 
 await assertLibraryRuntimeExports();
 typecheckPublishedApi();
+await testPublishedApi();
 
 const packRaw = execFileSync('npm', ['pack', '--dry-run', '--ignore-scripts', '--json'], {
   cwd: outDir,

@@ -19,6 +19,38 @@ describe('parseCliArgs --redact-keys', () => {
   });
 });
 
+describe('parseCliArgs push', () => {
+  it('reads the push subcommand and web credentials from flags or env', () => {
+    const fromFlags = parseCliArgs([
+      'push',
+      '--snapshots',
+      './snaps',
+      '--web-url',
+      'https://app.example.com',
+      '--instance',
+      'inst-1',
+      '--token',
+      'rdp_secret',
+    ]);
+    expect(fromFlags.command).toBe('push');
+    expect(fromFlags.snapshotDirectory).toBe('./snaps');
+    expect(fromFlags.webUrl).toBe('https://app.example.com');
+    expect(fromFlags.instanceId).toBe('inst-1');
+    expect(fromFlags.token).toBe('rdp_secret');
+
+    const fromEnv = parseCliArgs(['watch', '--push'], {
+      REDIS_DETECTIVE_WEB_URL: 'https://app.example.com',
+      REDIS_DETECTIVE_INSTANCE: 'inst-1',
+      REDIS_DETECTIVE_TOKEN: 'rdp_secret',
+    });
+    expect(fromEnv.command).toBe('watch');
+    expect(fromEnv.push).toBe(true);
+    expect(fromEnv.webUrl).toBe('https://app.example.com');
+    expect(fromEnv.instanceId).toBe('inst-1');
+    expect(fromEnv.token).toBe('rdp_secret');
+  });
+});
+
 describe('parseCliArgs', () => {
   it('defaults to no URL and text output', () => {
     const options = parseCliArgs([]);

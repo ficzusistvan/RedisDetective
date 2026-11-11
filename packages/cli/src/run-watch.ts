@@ -4,6 +4,7 @@ import { CLI_NAME } from './cli-usage.js';
 import type { DiagnosisReport } from './diagnosis-report.js';
 import { formatDuration } from './format-bytes.js';
 import { formatWatchTick } from './format-watch-tick.js';
+import type { PushResult } from './push-snapshots.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { SnapshotStore } from './snapshot-store.js';
 
@@ -58,6 +59,11 @@ export interface RunWatchRequest {
    * skip the snapshot that was just written. Must not throw.
    */
   readonly afterTick?: (report: DiagnosisReport) => Promise<void>;
+  /**
+   * When set, called after each saved sample so a long watch can upload to redis-detective-web.
+   * A failed push never aborts the session; the next interval can try again.
+   */
+  readonly pushSnapshots?: () => Promise<PushResult>;
   /** Extra lines after the standard "Watching …" banner (alert channel summary). */
   readonly extraOpeningLines?: readonly string[];
 }
@@ -78,6 +84,9 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     `Watching ${request.target} every ${formatDuration(request.intervalMs / 1_000)}, saving to ${request.store.describe}.`,
     'One line per sample, not the full report. Ctrl-C stops after the sample in flight.',
   ];
+  if (request.pushSnapshots !== undefined) {
+    lines.push('After each sample, snapshots are pushed to redis-detective-web.');
+  }
   if (request.repository !== null) {
     lines.push(
       `Candidate commits are not looked up while watching, so a long session makes no GitHub requests. Run ${diagnosisCommand(request)} afterwards for those.`,
@@ -87,6 +96,16 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     lines.push(...request.extraOpeningLines);
   }
   return lines;
+}
+
+function pushLine(result: PushResult): string {
+  if (result.ok) {
+    return 'Pushed snapshots to the web app.';
+  }
+  if (result.status === 409) {
+    return `Push skipped: ${result.message}`;
+  }
+  return `Push failed: ${result.message}`;
 }
 
 function closingLines(request: RunWatchRequest, summary: WatchSummary): readonly string[] {
@@ -167,6 +186,10 @@ export async function runWatch(
       } catch {
         writeLine('alert tick failed; watch continues.');
       }
+    }
+
+    if (request.pushSnapshots !== undefined) {
+      writeLine(pushLine(await request.pushSnapshots()));
     }
 
     if (stopSignal.aborted) {

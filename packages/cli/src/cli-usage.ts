@@ -29,6 +29,8 @@ Usage
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --interval 15m
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --fail-on-ttl-drop 20 --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
   ${CLI_NAME} test-alert --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
+  ${CLI_NAME} push --snapshots ./snaps --web-url https://app.example.com --instance <id> --token <token>
+  ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --push --web-url https://app.example.com --instance <id> --token <token>
 
 Commands
   (none)                  Sample once, and with --snapshots diagnose growth against the samples
@@ -47,6 +49,12 @@ Commands
                           the same threshold comparison as the CI gate. A breach notifies the
                           configured channels once, then stays quiet until --alert-cooldown
                           elapses or the condition clears (resolve).
+                          With --push, upload the directory to redis-detective-web after each
+                          sample (private Redis path).
+  push                    Upload every *.snapshot.json in --snapshots to redis-detective-web and
+                          start a diagnosis run there. Requires --web-url, --instance, and
+                          --token (or REDIS_DETECTIVE_WEB_URL / REDIS_DETECTIVE_INSTANCE /
+                          REDIS_DETECTIVE_TOKEN). No Redis connection is opened.
   test-alert              Send one sample notification per configured channel, so a webhook
   alerts test             can be verified without waiting for a real breach. Same flags as
                           watch for channels. Does not sample Redis.
@@ -70,6 +78,11 @@ Options
                           when big values are exhausting the --timeout budget on few keys.
       --interval <dur>    Time between watch samples: 45s, 15m, 2h, or a plain number of
                           seconds. At least ${String(MIN_WATCH_INTERVAL_MS / 1_000)}s, default ${String(DEFAULT_WATCH_INTERVAL_MS / 60_000)}m. Requires the watch command.
+      --push              After each watch sample, upload --snapshots to redis-detective-web.
+                          Requires --web-url, --instance, and --token (or their env vars).
+      --web-url <url>     Origin of redis-detective-web (or REDIS_DETECTIVE_WEB_URL).
+      --instance <id>     Instance id on the web app (or REDIS_DETECTIVE_INSTANCE).
+      --token <token>     Instance push token from the web app (or REDIS_DETECTIVE_TOKEN).
       --databases <list>  Comma-separated database indexes to sample (default 0).
       --redact-keys       Replace example key names with a placeholder, for a report you intend
                           to share. Key names often embed user ids or email addresses.

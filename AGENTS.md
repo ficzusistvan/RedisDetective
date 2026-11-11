@@ -211,4 +211,5 @@ subcommand runs the diagnosis path on an interval into a local snapshot director
 lookup and no model call per tick. When thresholds and a channel are configured it reuses the CI
 gate comparison and notifies Slack, a generic webhook, or PagerDuty (`packages/alerts`) without
 spamming: firing → resolved, cooldown, persisted state. `test-alert` / `alerts test` sends one
-sample per channel. See `docs/alerts.md` and `docs/mvp-scope.md`.
+sample per channel. `push` and `watch --push` upload that directory to redis-detective-web with an
+instance push token. See `docs/alerts.md` and `docs/mvp-scope.md`.

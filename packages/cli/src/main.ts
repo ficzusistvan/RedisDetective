@@ -54,6 +54,11 @@ import { renderTextReport } from './render-text-report.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { RunDiagnosisRequest } from './run-diagnosis.js';
 import { runHealthCheck } from './run-health-check.js';
+import {
+  pushSnapshotsToWeb,
+  uploadFilesFromSnapshotStore,
+} from './push-snapshots.js';
+import type { FetchLike, PushTarget } from './push-snapshots.js';
 import { runWatch } from './run-watch.js';
 import type { WatchDeps } from './run-watch.js';
 import { createFileSnapshotStore } from './snapshot-store.js';
@@ -131,6 +136,8 @@ export interface MainContext {
   readonly alertFetch?: AlertFetch;
   readonly alertWait?: AlertWait;
   readonly openAlertStateStore?: (path: string) => AlertStateStore;
+  /** Injected so `push` / `watch --push` never reach the network in tests. */
+  readonly fetch?: FetchLike;
 }
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
@@ -174,6 +181,17 @@ export async function main(context: MainContext): Promise<ExitCode> {
 
   if (options.command === 'watch') {
     return runWatchCommand(context, options);
+  }
+
+  if (options.command === 'push') {
+    return runPushCommand(context, options);
+  }
+
+  if (options.push) {
+    streams.writeError(
+      `--push requires the watch subcommand, or use ${CLI_NAME} push --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`,
+    );
+    return EXIT_CODES.usageError;
   }
 
   if (options.command === 'test-alert') {
@@ -313,7 +331,18 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     return EXIT_CODES.usageError;
   }
 
+  let pushTarget: PushTarget | null = null;
+  if (options.push) {
+    const resolved = resolvePushTarget(options);
+    if (resolved.ok === false) {
+      streams.writeError(resolved.message);
+      return EXIT_CODES.usageError;
+    }
+    pushTarget = resolved.target;
+  }
+
   const openStore = context.openSnapshotStore ?? createFileSnapshotStore;
+  const store = openStore(snapshotDirectory);
   const target = redactRedisUrl(options.redisUrl);
   const connected = await openConnection(context, options.redisUrl, target);
   if (connected.ok === false) {
@@ -346,11 +375,13 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     fetchImpl: alertFetch,
     ...(context.alertWait === undefined ? {} : { wait: context.alertWait }),
   });
+  const fetchImpl = context.fetch ?? globalThis.fetch.bind(globalThis);
+  const activePush = pushTarget;
 
   try {
     await runWatch(
       {
-        store: openStore(snapshotDirectory),
+        store,
         client: connected.connection.client,
         target,
         intervalMs: options.intervalMs ?? DEFAULT_WATCH_INTERVAL_MS,
@@ -366,6 +397,11 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
           streams.writeOut(`${line}\n`);
         },
         extraOpeningLines: formatWatchAlertBanner(alertConfig, alertSetup.configPath),
+        ...(activePush === null
+          ? {}
+          : {
+              pushSnapshots: () => pushStore(store, activePush, fetchImpl),
+            }),
         afterTick: async (report) => {
           if (alertConfig.rules.length === 0) {
             return;
@@ -416,6 +452,69 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
   } finally {
     await connected.connection.close();
   }
+}
+
+async function runPushCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {
+  const { streams } = context;
+  const snapshotDirectory = options.snapshotDirectory;
+  if (snapshotDirectory === null) {
+    streams.writeError(
+      `push requires --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`,
+    );
+    return EXIT_CODES.usageError;
+  }
+  const resolved = resolvePushTarget(options);
+  if (resolved.ok === false) {
+    streams.writeError(resolved.message);
+    return EXIT_CODES.usageError;
+  }
+  if (options.outputFormat !== 'text') {
+    streams.writeError(`push has no report output, so --format / --json do not apply.\n`);
+    return EXIT_CODES.usageError;
+  }
+
+  const openStore = context.openSnapshotStore ?? createFileSnapshotStore;
+  const store = openStore(snapshotDirectory);
+  const result = await pushStore(
+    store,
+    resolved.target,
+    context.fetch ?? globalThis.fetch.bind(globalThis),
+  );
+  if (result.ok) {
+    streams.writeOut(
+      `Pushed snapshots to ${resolved.target.webUrl.replace(/\/$/, '')} for instance ${resolved.target.instanceId}.\n`,
+    );
+    return EXIT_CODES.ok;
+  }
+  streams.writeError(`${result.message}\n`);
+  return EXIT_CODES.unexpectedError;
+}
+
+function resolvePushTarget(
+  options: CliOptions,
+): { ok: true; target: PushTarget } | { ok: false; message: string } {
+  if (options.webUrl === null || options.instanceId === null || options.token === null) {
+    return {
+      ok: false,
+      message: `Push needs --web-url, --instance, and --token (or REDIS_DETECTIVE_WEB_URL, REDIS_DETECTIVE_INSTANCE, and REDIS_DETECTIVE_TOKEN).\nRun ${CLI_NAME} --help for usage.\n`,
+    };
+  }
+  return {
+    ok: true,
+    target: {
+      webUrl: options.webUrl,
+      instanceId: options.instanceId,
+      token: options.token,
+    },
+  };
+}
+
+async function pushStore(
+  store: SnapshotStore,
+  target: PushTarget,
+  fetchImpl: FetchLike,
+): Promise<Awaited<ReturnType<typeof pushSnapshotsToWeb>>> {
+  return pushSnapshotsToWeb(target, await uploadFilesFromSnapshotStore(store), fetchImpl);
 }
 
 async function runTestAlertCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {

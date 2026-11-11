@@ -186,4 +186,33 @@ describe('runWatch', () => {
       'Full diagnosis: redis-detective --snapshots memory --repo acme/checkout',
     );
   });
+
+  it('pushes after each sample and keeps watching when a push is busy', async () => {
+    const stop = new AbortController();
+    const lines: string[] = [];
+    const pushes: number[] = [];
+
+    await runWatch(
+      watchRequest(stop, {
+        writeLine: (line) => lines.push(line),
+        pushSnapshots: () => {
+          pushes.push(pushes.length + 1);
+          if (pushes.length === 1) {
+            return Promise.resolve({
+              ok: false,
+              status: 409,
+              message: 'A run is already in progress for this instance.',
+            });
+          }
+          return Promise.resolve({ ok: true });
+        },
+      }),
+      stopAfterIntervals(stop, 2, []),
+    );
+
+    expect(pushes).toEqual([1, 2]);
+    expect(lines.join('\n')).toContain('After each sample, snapshots are pushed to redis-detective-web.');
+    expect(lines).toContain('Push skipped: A run is already in progress for this instance.');
+    expect(lines).toContain('Pushed snapshots to the web app.');
+  });
 });

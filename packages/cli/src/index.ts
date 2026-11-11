@@ -97,6 +97,18 @@ export type { RunWatchRequest, WatchDeps, WatchSummary } from './run-watch.js';
 export { formatWatchTick } from './format-watch-tick.js';
 export type { WatchTick } from './format-watch-tick.js';
 
+export {
+  pushSnapshotsToWeb,
+  uploadFilesFromSnapshotStore,
+  uploadFilesFromStore,
+} from './push-snapshots.js';
+export type {
+  FetchLike,
+  PushResult,
+  PushTarget,
+  SnapshotUploadFile,
+} from './push-snapshots.js';
+
 export { evaluateAlertRules } from './evaluate-alert-rules.js';
 export { formatWatchAlertBanner } from './format-watch-alert-banner.js';
 export { resolveAlertConfig } from './resolve-alert-config.js';

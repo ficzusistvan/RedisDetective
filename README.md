@@ -80,7 +80,36 @@ retention policy. When you arm `--fail-on-*` (the same thresholds as the CI gate
 channel, a breach can notify Slack, a generic webhook, or PagerDuty. A persistent breach is
 deduplicated and held to `--alert-cooldown` (default 1h) so a 15-minute tick does not spam;
 state is a small JSON file next to the snapshots so a restart does not re-page. See
-[docs/alerts.md](docs/alerts.md).
+[docs/alerts.md](docs/alerts.md). Nothing leaves the machine unless you ask it to.
+
+## Optional: push snapshots to redis-detective-web
+
+When Redis is not reachable from the hosted app, sample locally and upload the snapshot
+directory with a push token from the instance page:
+
+```bash
+redis-detective push \
+  --snapshots ./snaps \
+  --web-url https://your-app.example.com \
+  --instance <instance-id> \
+  --token <push-token>
+```
+
+Or push after every `watch` sample:
+
+```bash
+redis-detective watch \
+  --url redis://localhost:6379 \
+  --snapshots ./snaps \
+  --push \
+  --web-url https://your-app.example.com \
+  --instance <instance-id> \
+  --token <push-token>
+```
+
+`--web-url`, `--instance`, and `--token` also read `REDIS_DETECTIVE_WEB_URL`,
+`REDIS_DETECTIVE_INSTANCE`, and `REDIS_DETECTIVE_TOKEN`. Prefer `--redact-keys` before a push
+you intend to leave on a shared account.
 
 ## Optional: candidate commits (recommended second step)
 

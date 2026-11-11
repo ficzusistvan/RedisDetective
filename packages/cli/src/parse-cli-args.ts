@@ -18,7 +18,7 @@ import type { CliOutputFormat } from './output-format.js';
 import { MIN_WATCH_INTERVAL_MS } from './watch-defaults.js';
 
 export interface CliOptions {
-  /** `report` runs once; `watch` keeps sampling on an interval. */
+  /** `report` runs once; `watch` keeps sampling on an interval; `push` uploads snapshots. */
   readonly command: CliCommand;
   /** `null` when `--help` or `--version` was requested, or when no URL was supplied. */
   readonly redisUrl: string | null;
@@ -70,6 +70,14 @@ export interface CliOptions {
   readonly alertConfigPath: string | null;
   readonly alertStateFile: string | null;
   readonly alertDryRun: boolean;
+  /** Origin of redis-detective-web. `null` until `--web-url` or `REDIS_DETECTIVE_WEB_URL`. */
+  readonly webUrl: string | null;
+  /** Instance id on the web app. `null` until `--instance` or `REDIS_DETECTIVE_INSTANCE`. */
+  readonly instanceId: string | null;
+  /** Push token for the web app. `null` until `--token` or `REDIS_DETECTIVE_TOKEN`. */
+  readonly token: string | null;
+  /** When true on `watch`, push the snapshot directory after each sample. */
+  readonly push: boolean;
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -115,6 +123,10 @@ interface MutableCliOptions {
   alertConfigPath: string | null;
   alertStateFile: string | null;
   alertDryRun: boolean;
+  webUrl: string | null;
+  instanceId: string | null;
+  token: string | null;
+  push: boolean;
   help: boolean;
   version: boolean;
 }
@@ -253,6 +265,10 @@ export function parseCliArgs(
     alertConfigPath: null,
     alertStateFile: null,
     alertDryRun: false,
+    webUrl: null,
+    instanceId: null,
+    token: null,
+    push: false,
     help: false,
     version: false,
   };
@@ -432,6 +448,40 @@ export function parseCliArgs(
         options.skipGh = true;
         break;
 
+      case '--push':
+        options.push = true;
+        break;
+
+      case '--web-url': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--web-url expects the redis-detective-web origin.');
+        }
+        options.webUrl = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--instance': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--instance expects an instance id.');
+        }
+        options.instanceId = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--token': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--token expects a push token.');
+        }
+        options.token = value;
+        index = nextIndex;
+        break;
+      }
+
       case '--snapshots': {
         const [value, nextIndex] = takeValue(flag, inlineValue, index);
         if (value === '') {
@@ -516,6 +566,16 @@ export function parseCliArgs(
 
   if (options.redisUrl === null) {
     options.redisUrl = env['REDIS_URL'] ?? null;
+  }
+
+  if (options.webUrl === null) {
+    options.webUrl = firstEnv(env, 'REDIS_DETECTIVE_WEB_URL');
+  }
+  if (options.instanceId === null) {
+    options.instanceId = firstEnv(env, 'REDIS_DETECTIVE_INSTANCE');
+  }
+  if (options.token === null) {
+    options.token = firstEnv(env, 'REDIS_DETECTIVE_TOKEN');
   }
 
   applyAlertEnvFallbacks(options, env);

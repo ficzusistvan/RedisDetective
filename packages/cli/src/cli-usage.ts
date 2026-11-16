@@ -89,6 +89,13 @@ Options
       --snapshots <dir>   Save this sample and diagnose growth against previous samples in the
                           directory. With no --url, diagnose from stored snapshots only — no
                           Redis connection is opened.
+      --min-growth-bytes <n>
+                          Absolute floor for a memory finding, in bytes. Default 8 MiB.
+                          A finding must also clear --min-growth-ratio.
+      --min-growth-ratio <fraction>
+                          Relative floor for a memory finding, as a fraction of the starting
+                          stored size. Default 0.02 (2%). The same pair qualifies a one-interval
+                          step and a sustained rise.
       --repo <owner/repo> GitHub repository to search for candidate commits in the growth
                           window (recommended second step after a Redis Cause). Requires
                           --snapshots; reuse the same snapshot directory as the Redis-only pass.

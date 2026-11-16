@@ -11,9 +11,16 @@ import type {
 import type { EvidenceOptions, ResolvedEvidenceOptions } from './evidence-options.js';
 import { attributeGrowthToPatterns } from './attribute-growth-to-patterns.js';
 import { createEvidenceId } from './create-evidence-id.js';
+import { describePatternContributors } from './describe-pattern-contributors.js';
 import { detectMemoryAnomalies } from './detect-memory-anomalies.js';
 import { detectTtlDrift } from './detect-ttl-drift.js';
 import { resolveEvidenceOptions } from './evidence-options.js';
+import {
+  formatBinaryMagnitude,
+  formatRatioPercent,
+  formatUtcInstant,
+} from './format-reported-quantity.js';
+import { relativeChange } from './relative-change.js';
 import {
   comparableStoredBytes,
   readGrowthMetric,
@@ -232,6 +239,51 @@ function crossReferenceTtlDrift(
 }
 
 /**
+ * What to say when nothing rose far enough to be an anomaly.
+ *
+ * A flat window may say that no growth was found. A window whose stored size did change says the
+ * change, in MiB/GiB and clock time, including when that change is still under the anomaly rule.
+ * Patterns that account for at least `minAttributionShare` of a sub-threshold rise are named as
+ * contributors. They are not attributions and they are not a cause.
+ */
+function noGrowthDetail(
+  snapshots: readonly RedisSnapshot[],
+  options: ResolvedEvidenceOptions,
+): string {
+  const metric = selectGrowthMetric(snapshots);
+  const comparable = snapshots.filter(
+    (snapshot) => comparableStoredBytes(snapshot, metric) !== null,
+  );
+  const first = comparable[0];
+  const last = comparable[comparable.length - 1];
+  const from = formatUtcInstant(snapshots[0]?.capturedAt ?? '');
+  const to = formatUtcInstant(snapshots[snapshots.length - 1]?.capturedAt ?? '');
+  const span = `Across ${String(snapshots.length)} snapshots from ${from} to ${to}.`;
+
+  const before = first === undefined ? null : comparableStoredBytes(first, metric);
+  const after = last === undefined ? null : comparableStoredBytes(last, metric);
+  if (
+    first === undefined ||
+    last === undefined ||
+    before === null ||
+    after === null ||
+    before === after
+  ) {
+    return `No memory growth was found across ${String(snapshots.length)} snapshots from ${from} to ${to}.`;
+  }
+
+  const delta = after - before;
+  const ratio = relativeChange(before, after);
+  if (delta < 0) {
+    return `Memory fell ${formatBinaryMagnitude(delta)} (-${formatRatioPercent(ratio)}). ${span}`;
+  }
+
+  const growth = `Memory grew ${formatBinaryMagnitude(delta)} (+${formatRatioPercent(ratio)}), below anomaly thresholds (${formatBinaryMagnitude(options.minGrowthBytes)} and ${formatRatioPercent(options.minGrowthRatio)}).`;
+  const contributors = describePatternContributors(first, last, delta, options);
+  return [growth, ...contributors, span].join(' ');
+}
+
+/**
  * Composes the detectors into the single `EvidenceGraph` that the rest of the system consumes.
  *
  * The only producer of an `EvidenceGraph`. `packages/reasoner` reads one and may not add to it, so
@@ -296,12 +348,13 @@ export function buildEvidenceGraph(input: BuildEvidenceGraphInput): EvidenceGrap
     ...attributionGaps(anomalies, attributions),
   ];
 
-  // Two stored-size readings are what "we looked and the memory did not grow" is earned with. Fewer
-  // than that, and the memory-not-comparable gap is the honest result.
+  // Two stored-size readings are what a statement about memory movement is earned with. Fewer than
+  // that, and the memory-not-comparable gap is the honest result. The detail distinguishes a flat
+  // window from one that moved and still missed the anomaly rule.
   if (anomalies.length === 0 && ttlDrift.length === 0 && storedSizeReadings >= 2) {
     gaps.push({
       kind: 'no-growth-detected',
-      detail: `No memory anomaly or TTL drift was found across ${snapshots.length} snapshots spanning ${window.from} to ${window.to}. Memory did not grow by more than the ${options.minGrowthBytes}-byte and ${options.minGrowthRatio} thresholds in any comparable interval.`,
+      detail: noGrowthDetail(snapshots, options),
       remedy: null,
     });
   }

@@ -132,6 +132,19 @@ describe('parseCliArgs', () => {
     ).toBe('redis://flag:6379');
   });
 
+  it('parses memory-growth thresholds and rejects values evidence options reject', () => {
+    expect(parseCliArgs([]).minGrowthBytes).toBeNull();
+    expect(parseCliArgs([]).minGrowthRatio).toBeNull();
+
+    const options = parseCliArgs(['--min-growth-bytes', '1048576', '--min-growth-ratio=0.05']);
+    expect(options.minGrowthBytes).toBe(1_048_576);
+    expect(options.minGrowthRatio).toBe(0.05);
+
+    expect(() => parseCliArgs(['--min-growth-ratio', '1.5'])).toThrow(/minGrowthRatio/);
+    expect(() => parseCliArgs(['--min-growth-bytes', '-1'])).toThrow(/minGrowthBytes/);
+    expect(() => parseCliArgs(['--min-growth-bytes', 'nope'])).toThrow(CliUsageError);
+  });
+
   it('parses the sampling flags', () => {
     const options = parseCliArgs([
       '--url',

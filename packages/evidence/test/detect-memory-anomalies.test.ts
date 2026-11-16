@@ -11,6 +11,21 @@ function kinds(snapshots: Parameters<typeof detectMemoryAnomalies>[0]): readonly
   return detectMemoryAnomalies(snapshots, options).map((anomaly) => anomaly.kind);
 }
 
+/**
+ * Stored-size series. Dataset is set equal to `used_memory`, so the byte figures below are the
+ * counter the detector compares rather than 90% of it.
+ */
+function storedSeries(usedMemoryBytes: readonly number[]) {
+  return usedMemoryBytes.map((bytes, index) =>
+    snapshotFixture({
+      snapshotId: `snapshot-${index + 1}`,
+      capturedAt: hoursIn(index),
+      usedMemoryBytes: bytes,
+      memory: { usedMemoryDatasetBytes: bytes },
+    }),
+  );
+}
+
 describe('detectMemoryAnomalies', () => {
   describe('does nothing to report', () => {
     it('for an empty list', () => {
@@ -149,12 +164,18 @@ describe('detectMemoryAnomalies', () => {
       expect(anomaly?.evidenceStrength).toBe('moderate');
     });
 
-    it('is reported instead of a trend, so the same bytes are not counted twice', () => {
-      // Rises every interval, but one interval is a step. The step is the finding.
-      const detected = kinds(series([64 * MB, 66 * MB, 200 * MB, 202 * MB]));
+    it('is a single jump between flat readings, so the same bytes are not also a trend', () => {
+      const detected = kinds(series([64 * MB, 64 * MB, 200 * MB, 200 * MB]));
 
-      expect(detected).toContain('memory-step-change');
-      expect(detected).not.toContain('memory-growth');
+      expect(detected).toEqual(['memory-step-change']);
+    });
+
+    it('uses the same 8 MiB and 2% pair as a sustained rise', () => {
+      // +47 MiB and +5.2% of ~909 MiB, in one interval. That clears both bars, so it is a step.
+      const start = 909 * MB;
+      const detected = kinds(storedSeries([start, start + 47 * MB]));
+
+      expect(detected).toEqual(['memory-step-change']);
     });
   });
 
@@ -174,13 +195,37 @@ describe('detectMemoryAnomalies', () => {
       );
     });
 
-    it('needs three snapshots, not two', () => {
-      // Same per-interval rise, one snapshot short of a trend and too small to be a step.
-      expect(kinds(series([64 * MB, 72 * MB]))).toEqual([]);
+    it('needs three snapshots, so two snapshots that clear the pair are a step', () => {
+      // +8 MiB and +12.5% clears the shared pair. The shape is one interval, so it is a step.
+      expect(kinds(storedSeries([64 * MB, 72 * MB]))).toEqual(['memory-step-change']);
     });
 
     it('stops the run at the first interval that does not rise', () => {
-      expect(kinds(series([64 * MB, 72 * MB, 70 * MB, 78 * MB]))).toEqual([]);
+      // The dip breaks the trend. Each side still clears 8 MiB and 2%, so each is its own step.
+      expect(kinds(storedSeries([64 * MB, 72 * MB, 70 * MB, 78 * MB]))).toEqual([
+        'memory-step-change',
+        'memory-step-change',
+      ]);
+    });
+
+    it('reports a ~5% rise on a ~909 MiB instance as one sustained trend', () => {
+      const start = 909 * MB;
+      const total = Math.round(46.9 * MB);
+      const bytes = [0, 1, 2, 3, 4].map((step) => start + Math.round((total * step) / 4));
+
+      const anomalies = detectMemoryAnomalies(storedSeries(bytes), options);
+      const growth = anomalies.find((anomaly) => anomaly.kind === 'memory-growth');
+
+      expect(anomalies.map((anomaly) => anomaly.kind)).toEqual(['memory-growth']);
+      expect(growth?.deltaBytes).toBe(total);
+      expect(total / start).toBeGreaterThan(0.02);
+      expect(total / start).toBeLessThan(0.1);
+    });
+
+    it('does not flag an 8 MiB twitch on a ~909 MiB instance', () => {
+      const start = 909 * MB;
+
+      expect(detectMemoryAnomalies(storedSeries([start, start + 8 * MB]), options)).toEqual([]);
     });
 
     it('is strong when the key count corroborates it', () => {
@@ -378,14 +423,41 @@ describe('detectMemoryAnomalies', () => {
 
     it('does not bridge a run across a dropped interval', () => {
       const snapshots = [
-        snapshotFixture({ snapshotId: 'a', capturedAt: hoursIn(0), usedMemoryBytes: 64 * MB }),
-        snapshotFixture({ snapshotId: 'b', capturedAt: hoursIn(1), usedMemoryBytes: 72 * MB }),
+        snapshotFixture({
+          snapshotId: 'a',
+          capturedAt: hoursIn(0),
+          usedMemoryBytes: 64 * MB,
+          memory: { usedMemoryDatasetBytes: 64 * MB },
+        }),
+        snapshotFixture({
+          snapshotId: 'b',
+          capturedAt: hoursIn(1),
+          usedMemoryBytes: 72 * MB,
+          memory: { usedMemoryDatasetBytes: 72 * MB },
+        }),
         // Ten hours later: the interval is dropped, so the run cannot continue through it.
-        snapshotFixture({ snapshotId: 'c', capturedAt: hoursIn(11), usedMemoryBytes: 80 * MB }),
-        snapshotFixture({ snapshotId: 'd', capturedAt: hoursIn(12), usedMemoryBytes: 88 * MB }),
+        snapshotFixture({
+          snapshotId: 'c',
+          capturedAt: hoursIn(11),
+          usedMemoryBytes: 80 * MB,
+          memory: { usedMemoryDatasetBytes: 80 * MB },
+        }),
+        snapshotFixture({
+          snapshotId: 'd',
+          capturedAt: hoursIn(12),
+          usedMemoryBytes: 88 * MB,
+          memory: { usedMemoryDatasetBytes: 88 * MB },
+        }),
       ];
 
-      expect(kinds(snapshots)).toEqual([]);
+      const anomalies = detectMemoryAnomalies(snapshots, options);
+
+      expect(anomalies.map((anomaly) => anomaly.kind)).toEqual([
+        'memory-step-change',
+        'memory-step-change',
+      ]);
+      expect(anomalies.map((anomaly) => anomaly.snapshotIdBefore)).toEqual(['a', 'c']);
+      expect(anomalies.map((anomaly) => anomaly.snapshotIdAfter)).toEqual(['b', 'd']);
     });
   });
 

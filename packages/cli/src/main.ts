@@ -7,6 +7,7 @@ import {
 } from '@redis-detective/alerts';
 import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
 import { NotImplementedError } from '@redis-detective/core-types';
+import type { EvidenceOptions } from '@redis-detective/evidence';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
@@ -54,10 +55,7 @@ import { renderTextReport } from './render-text-report.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { RunDiagnosisRequest } from './run-diagnosis.js';
 import { runHealthCheck } from './run-health-check.js';
-import {
-  pushSnapshotsToWeb,
-  uploadFilesFromSnapshotStore,
-} from './push-snapshots.js';
+import { pushSnapshotsToWeb, uploadFilesFromSnapshotStore } from './push-snapshots.js';
 import type { FetchLike, PushTarget } from './push-snapshots.js';
 import { runWatch } from './run-watch.js';
 import type { WatchDeps } from './run-watch.js';
@@ -390,6 +388,7 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
         memorySamples: options.memorySamples,
         databases: options.databases,
         redactKeys: options.redactKeys,
+        ...evidenceOptionsField(options),
         repository: options.repository,
         now: context.now,
         stopSignal: context.stopSignal ?? new AbortController().signal,
@@ -458,9 +457,7 @@ async function runPushCommand(context: MainContext, options: CliOptions): Promis
   const { streams } = context;
   const snapshotDirectory = options.snapshotDirectory;
   if (snapshotDirectory === null) {
-    streams.writeError(
-      `push requires --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`,
-    );
+    streams.writeError(`push requires --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`);
     return EXIT_CODES.usageError;
   }
   const resolved = resolvePushTarget(options);
@@ -569,6 +566,18 @@ async function runTestAlertCommand(context: MainContext, options: CliOptions): P
   }
 }
 
+function evidenceOptionsField(options: CliOptions): { readonly evidenceOptions?: EvidenceOptions } {
+  if (options.minGrowthBytes === null && options.minGrowthRatio === null) {
+    return {};
+  }
+  return {
+    evidenceOptions: {
+      ...(options.minGrowthBytes === null ? {} : { minGrowthBytes: options.minGrowthBytes }),
+      ...(options.minGrowthRatio === null ? {} : { minGrowthRatio: options.minGrowthRatio }),
+    },
+  };
+}
+
 async function runDiagnosisCommand(
   context: MainContext,
   options: CliOptions,
@@ -595,6 +604,7 @@ async function runDiagnosisCommand(
     memorySamples: options.memorySamples,
     databases: options.databases,
     redactKeys: options.redactKeys,
+    ...evidenceOptionsField(options),
     repository: repositoryResult.repository,
     lookbackMs: (options.lookbackHours ?? DEFAULT_COMMIT_LOOKBACK_HOURS) * 60 * 60 * 1_000,
     ...(repositoryResult.createCommitSource === undefined

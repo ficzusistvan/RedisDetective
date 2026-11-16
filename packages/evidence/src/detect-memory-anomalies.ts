@@ -119,11 +119,13 @@ function detectStepChange(
   }
   const delta = valueAfter - valueBefore;
 
-  // Both thresholds, not either. A 25% jump on a 4 MB instance is noise; 8 MB spread over a week is
-  // not a step. Requiring both keeps small instances quiet without missing real deploys.
+  // Both thresholds, not either. 8 MiB on a 100 GiB instance is routine churn, and 2% of a 4 MiB
+  // instance is still under the absolute floor. Requiring both is what the two bars are for.
+  // This interval is a step because the change happened in one comparable interval. A run that
+  // rises at every snapshot is a trend, and it uses this same pair — not a harsher percentage.
   if (
     delta < options.minGrowthBytes ||
-    relativeChange(valueBefore, valueAfter) < options.stepChangeRatio
+    relativeChange(valueBefore, valueAfter) < options.minGrowthRatio
   ) {
     return null;
   }
@@ -355,6 +357,23 @@ function risingRuns(
   return runs;
 }
 
+/** Interval indexes whose endpoints are adjacent snapshots inside `run`. */
+function indexesCoveredByRun(
+  run: readonly RedisSnapshot[],
+  intervals: readonly Interval[],
+): readonly number[] {
+  const position = new Map(run.map((snapshot, index) => [snapshot.snapshotId, index]));
+  const covered: number[] = [];
+  for (const interval of intervals) {
+    const before = position.get(interval.before.snapshotId);
+    const after = position.get(interval.after.snapshotId);
+    if (before !== undefined && after !== undefined && after === before + 1) {
+      covered.push(interval.index);
+    }
+  }
+  return covered;
+}
+
 function detectSustainedGrowth(
   run: readonly RedisSnapshot[],
   metric: GrowthMetric,
@@ -373,8 +392,9 @@ function detectSustainedGrowth(
   }
   const delta = valueAfter - valueBefore;
 
-  // Both thresholds again: a relative rise keeps large instances from flagging routine churn, and an
-  // absolute floor keeps a 12% rise on a 2 MB instance from being called a memory problem.
+  // Same pair as a step: at least minGrowthBytes and at least minGrowthRatio of the starting
+  // stored size. The finding is a trend because stored size rose at every snapshot in the run,
+  // not because its percentage cleared a lower bar than a step's.
   if (
     delta < options.minGrowthBytes ||
     relativeChange(valueBefore, valueAfter) < options.minGrowthRatio
@@ -416,11 +436,11 @@ function detectSustainedGrowth(
  * Pure and offline: no clock, no randomness, no I/O. The same snapshots must always produce the
  * same anomalies in the same order.
  *
- * A single interval yields at most one *memory* anomaly, and a step change wins over a trend: the
- * two would otherwise describe the same bytes twice, attribution would run over overlapping
- * windows, and the report would state one cause as though it were two. Anomalies on other metrics
- * (`key_count`, `mem_fragmentation_ratio`, `evicted_keys`) are different observations about the same
- * interval and can legitimately coexist with a memory one.
+ * A rising run of at least three snapshots is one memory-growth finding. A single comparable
+ * interval that is not part of such a run is a memory-step-change. Both use the same byte and
+ * ratio thresholds; the kind is the shape, so the same bytes are not described twice. Anomalies
+ * on other metrics (`key_count`, `mem_fragmentation_ratio`, `evicted_keys`) are different
+ * observations about the same interval and can legitimately coexist with a memory one.
  */
 export function detectMemoryAnomalies(
   snapshots: readonly RedisSnapshot[],
@@ -439,16 +459,34 @@ export function detectMemoryAnomalies(
     options,
   );
   const anomalies: AnomalyEvent[] = [];
-  const stepChangeIndexes = new Set<number>();
+  const trendIndexes = new Set<number>();
 
-  // A step change is a stored-size event, so it is taken from the readings that still describe how
-  // much data is stored. Eviction onset stays on the full list: a resident-zero sample can still
-  // be the moment evictions start.
+  // Shape first. A run that rises at every snapshot is one trend, even when an interval inside it
+  // would also clear the shared thresholds. Those intervals are not also reported as steps.
+  for (const run of risingRuns(
+    memoryIntervals,
+    (snapshot) => comparableStoredBytes(snapshot, metric) ?? Number.NaN,
+    MIN_RUN_FOR_TREND,
+  )) {
+    const sustained = detectSustainedGrowth(run, metric, options);
+    if (sustained === null) {
+      continue;
+    }
+    anomalies.push(sustained);
+    for (const index of indexesCoveredByRun(run, memoryIntervals)) {
+      trendIndexes.add(index);
+    }
+  }
+
+  // A step is one comparable interval that is not already inside a trend. Eviction onset stays on
+  // the full list: a resident-zero sample can still be the moment evictions start.
   for (const interval of memoryIntervals) {
+    if (trendIndexes.has(interval.index)) {
+      continue;
+    }
     const stepChange = detectStepChange(interval, metric, options);
     if (stepChange !== null) {
       anomalies.push(stepChange);
-      stepChangeIndexes.add(interval.index);
     }
   }
 
@@ -456,22 +494,6 @@ export function detectMemoryAnomalies(
     const evictionOnset = detectEvictionOnset(interval);
     if (evictionOnset !== null) {
       anomalies.push(evictionOnset);
-    }
-  }
-
-  // Span-shaped findings, each reported once over the longest window in which it holds.
-  // A span containing a step change is already reported as that step change.
-  const trendIntervals = memoryIntervals.filter(
-    (interval) => !stepChangeIndexes.has(interval.index),
-  );
-  for (const run of risingRuns(
-    trendIntervals,
-    (snapshot) => comparableStoredBytes(snapshot, metric) ?? Number.NaN,
-    MIN_RUN_FOR_TREND,
-  )) {
-    const sustained = detectSustainedGrowth(run, metric, options);
-    if (sustained !== null) {
-      anomalies.push(sustained);
     }
   }
 

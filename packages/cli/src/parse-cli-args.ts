@@ -5,6 +5,7 @@ import {
   parseAlertDurationMs,
 } from '@redis-detective/alerts';
 import type { AlertSeverity } from '@redis-detective/alerts';
+import { EvidenceOptionsError, resolveEvidenceOptions } from '@redis-detective/evidence';
 import {
   GITHUB_APP_ENV_VARS,
   GITHUB_PERSONAL_TOKEN_ENV_VARS,
@@ -30,6 +31,15 @@ export interface CliOptions {
   /** `SAMPLES` for `MEMORY USAGE` on nested values. `null` leaves the sampler's default. */
   readonly memorySamples: number | null;
   readonly databases: readonly number[] | null;
+  /**
+   * Absolute floor for a memory finding, in bytes. `null` leaves the evidence default (8 MiB).
+   */
+  readonly minGrowthBytes: number | null;
+  /**
+   * Relative floor for a memory finding, as a fraction of starting stored size. `null` leaves the
+   * evidence default (0.02). The same pair qualifies a step and a sustained rise.
+   */
+  readonly minGrowthRatio: number | null;
   readonly redactKeys: boolean;
   /**
    * When true, personal GitHub credentials are `GITHUB_TOKEN` / `GH_TOKEN` only.
@@ -98,6 +108,8 @@ interface MutableCliOptions {
   timeoutMs: number | null;
   memorySamples: number | null;
   databases: readonly number[] | null;
+  minGrowthBytes: number | null;
+  minGrowthRatio: number | null;
   redactKeys: boolean;
   skipGh: boolean;
   snapshotDirectory: string | null;
@@ -240,6 +252,8 @@ export function parseCliArgs(
     timeoutMs: null,
     memorySamples: null,
     databases: null,
+    minGrowthBytes: null,
+    minGrowthRatio: null,
     redactKeys: false,
     skipGh: false,
     snapshotDirectory: null,
@@ -282,7 +296,9 @@ export function parseCliArgs(
       return [inlineValue, index];
     }
     const next = flags[index + 1];
-    if (next === undefined || next.startsWith('-')) {
+    // A negative number is a value (`--min-growth-bytes -1`), not another flag. Anything else
+    // that starts with `-` is a missing value, so the error names the flag rather than the token.
+    if (next === undefined || (next.startsWith('-') && !/^-[\d.]/.test(next))) {
       throw new CliUsageError(`${flag} expects a value.`);
     }
     return [next, index + 1];
@@ -545,6 +561,20 @@ export function parseCliArgs(
         break;
       }
 
+      case '--min-growth-bytes': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.minGrowthBytes = parseEvidenceThreshold(flag, value, 'minGrowthBytes');
+        index = nextIndex;
+        break;
+      }
+
+      case '--min-growth-ratio': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.minGrowthRatio = parseEvidenceThreshold(flag, value, 'minGrowthRatio');
+        index = nextIndex;
+        break;
+      }
+
       case '--databases': {
         const [value, nextIndex] = takeValue(flag, inlineValue, index);
         options.databases = parseDatabaseList(value);
@@ -617,6 +647,23 @@ export function parseCliArgs(
 function requireNonEmpty(flag: string, value: string): string {
   if (value === '') {
     throw new CliUsageError(`${flag} expects a value.`);
+  }
+  return value;
+}
+
+function parseEvidenceThreshold(
+  flag: string,
+  raw: string,
+  field: 'minGrowthBytes' | 'minGrowthRatio',
+): number {
+  const value = Number(raw);
+  try {
+    resolveEvidenceOptions({ [field]: value });
+  } catch (error) {
+    if (error instanceof EvidenceOptionsError) {
+      throw new CliUsageError(`${flag}: ${error.message}`);
+    }
+    throw error;
   }
   return value;
 }

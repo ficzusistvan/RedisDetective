@@ -25,6 +25,7 @@ import { GitHubApiError } from '@redis-detective/github-integration';
 import type { GitHubFetch } from '@redis-detective/github-integration';
 import { SAMPLER_DEFAULTS, SAMPLER_HARD_LIMITS } from '@redis-detective/sampler';
 import { leakingSnapshots } from './helpers/leaking-snapshots.js';
+import { patternFixture, snapshotFixture } from './helpers/snapshot-builder.js';
 import { fakeGitHubCommitSource, rawCommit } from './helpers/fake-github-commit-source.js';
 import { FakeRedisCommandClient, fakeKeys } from '@redis-detective/sampler/testing';
 
@@ -283,6 +284,108 @@ describe('main', () => {
       expect(result.exitCode).toBe(EXIT_CODES.ok);
       expect(result.out).toContain('Not enough snapshots');
       expect(await store.list()).toHaveLength(1);
+    });
+
+    it('reports a ~5% rise on a ~909 MiB instance in human units', async () => {
+      const result = await run(['--snapshots', './snaps', '--json'], {
+        openSnapshotStore: () => createMemorySnapshotStore(largeInstanceSnapshots()),
+      });
+      const report = JSON.parse(result.out) as {
+        explanation: {
+          headline: string;
+          summary: string;
+          likelyCause: { pattern: string } | null;
+          evidenceStrength: string;
+        };
+        graph: {
+          anomalies: readonly { kind: string }[];
+          attributions: readonly { pattern: string }[];
+        };
+      };
+      const prose = `${report.explanation.headline}\n${report.explanation.summary}`;
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(report.graph.anomalies.map((anomaly) => anomaly.kind)).toContain('memory-growth');
+      expect(report.graph.attributions.map((attribution) => attribution.pattern)).toContain(
+        'session:*',
+      );
+      expect(report.graph.attributions.map((attribution) => attribution.pattern)).not.toContain(
+        'cache:*',
+      );
+      expect(report.explanation.likelyCause?.pattern).toBe('session:*');
+      expect(prose).toContain('session:*');
+      expect(prose).toMatch(/MiB|GiB/);
+      expect(prose).toContain('2026-11-14 03:30 UTC');
+      expect(prose).not.toContain('No memory growth was found in this window.');
+      expect(prose).not.toContain('8388608');
+      expect(prose).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('says a smaller rise is below the anomaly thresholds instead of claiming no growth', async () => {
+      const result = await run(['--snapshots', './snaps', '--json'], {
+        openSnapshotStore: () => createMemorySnapshotStore(belowThresholdSnapshots()),
+      });
+      const report = JSON.parse(result.out) as {
+        explanation: {
+          headline: string;
+          summary: string;
+          likelyCause: { pattern: string } | null;
+          evidenceStrength: string;
+        };
+      };
+      const prose = `${report.explanation.headline}\n${report.explanation.summary}`;
+
+      expect(report.explanation.headline).toBe(
+        'Memory grew 10 MiB (+1%), below anomaly thresholds (8 MiB and 2%).',
+      );
+      expect(report.explanation.summary).toContain(
+        'session:* contributed the most estimated growth, 8 MiB, as more keys',
+      );
+      expect(report.explanation.summary).not.toContain('cache:*');
+      expect(report.explanation.likelyCause).toBeNull();
+      expect(report.explanation.evidenceStrength).toBe('unclear');
+      expect(prose).not.toContain('8388608');
+      expect(prose).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    });
+
+    it('threads --min-growth-bytes and --min-growth-ratio into the diagnosis', async () => {
+      const quiet = await run(['--snapshots', './snaps', '--json'], {
+        openSnapshotStore: () => createMemorySnapshotStore(belowThresholdSnapshots()),
+      });
+      const lowered = await run(
+        [
+          '--snapshots',
+          './snaps',
+          '--json',
+          '--min-growth-bytes',
+          '1048576',
+          '--min-growth-ratio',
+          '0.005',
+        ],
+        {
+          openSnapshotStore: () => createMemorySnapshotStore(belowThresholdSnapshots()),
+        },
+      );
+      const quietReport = JSON.parse(quiet.out) as {
+        graph: { anomalies: readonly { kind: string }[] };
+      };
+      const loweredReport = JSON.parse(lowered.out) as {
+        explanation: { headline: string };
+        graph: { anomalies: readonly { kind: string }[] };
+      };
+
+      expect(quietReport.graph.anomalies).toEqual([]);
+      expect(loweredReport.graph.anomalies.map((anomaly) => anomaly.kind)).toContain(
+        'memory-growth',
+      );
+      expect(loweredReport.explanation.headline).not.toContain('below anomaly thresholds');
+    });
+
+    it('rejects an impossible growth ratio as a usage error', async () => {
+      const result = await run(['--snapshots', './snaps', '--min-growth-ratio', '1.5']);
+
+      expect(result.exitCode).toBe(EXIT_CODES.usageError);
+      expect(result.err).toContain('minGrowthRatio');
     });
 
     it('writes diagnosis JSON on --json', async () => {
@@ -843,3 +946,101 @@ describe('main', () => {
     });
   });
 });
+
+const MIB = 1024 * 1024;
+
+function storedSnapshot(
+  snapshotId: string,
+  capturedAt: string,
+  bytes: number,
+  patterns: ReturnType<typeof patternFixture>[],
+) {
+  return snapshotFixture({
+    snapshotId,
+    capturedAt,
+    memory: {
+      usedMemoryBytes: bytes,
+      usedMemoryRssBytes: bytes,
+      usedMemoryDatasetBytes: bytes,
+      usedMemoryPeakBytes: bytes,
+      memFragmentationRatio: 1.1,
+      evictedKeys: 0,
+      expiredKeys: 0,
+    },
+    keyspace: [{ db: 0, keyCount: 100_000, keysWithExpiry: 90_000, averageTtlMs: 3_600_000 }],
+    patterns,
+  });
+}
+
+function growingPatterns(
+  sessionBytes: number,
+  sessionKeys: number,
+  cacheBytes: number,
+  cacheKeys: number,
+) {
+  return [
+    patternFixture({
+      pattern: 'session:*',
+      estimatedBytes: sessionBytes,
+      estimatedKeyCount: sessionKeys,
+      sampledKeyCount: 100,
+      keysWithTtl: 100,
+      keysWithoutTtl: 0,
+      medianTtlSeconds: 3_600,
+    }),
+    patternFixture({
+      pattern: 'cache:*',
+      estimatedBytes: cacheBytes,
+      estimatedKeyCount: cacheKeys,
+      sampledKeyCount: 100,
+      keysWithTtl: 80,
+      keysWithoutTtl: 20,
+      medianTtlSeconds: 3_600,
+    }),
+  ];
+}
+
+function largeInstanceSnapshots() {
+  const start = 909 * MIB;
+  const total = Math.round(46.9 * MIB);
+  const at = [
+    '2026-11-14T03:30:00.000Z',
+    '2026-11-14T03:45:00.000Z',
+    '2026-11-14T04:00:00.000Z',
+    '2026-11-14T04:15:00.000Z',
+    '2026-11-14T04:32:00.000Z',
+  ];
+  return at.map((capturedAt, index) => {
+    const progress = index / 4;
+    return storedSnapshot(
+      `snapshot-${index + 1}`,
+      capturedAt,
+      start + Math.round((total * index) / 4),
+      growingPatterns(
+        Math.round((80 + 40 * progress) * MIB),
+        Math.round(8_000 + 8_000 * progress),
+        Math.round((8 + 2 * progress) * MIB),
+        Math.round(1_000 + 100 * progress),
+      ),
+    );
+  });
+}
+
+function belowThresholdSnapshots() {
+  const at = ['2026-11-14T03:30:00.000Z', '2026-11-14T04:00:00.000Z', '2026-11-14T04:32:00.000Z'];
+  const memory = [1000, 1005, 1010];
+  return at.map((capturedAt, index) => {
+    const progress = index / 2;
+    return storedSnapshot(
+      `snapshot-${index + 1}`,
+      capturedAt,
+      (memory[index] ?? 1000) * MIB,
+      growingPatterns(
+        Math.round((20 + 8 * progress) * MIB),
+        Math.round(1_000 + 3_000 * progress),
+        Math.round((5 + progress) * MIB),
+        Math.round(1_000 + 50 * progress),
+      ),
+    );
+  });
+}

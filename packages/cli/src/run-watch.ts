@@ -1,3 +1,4 @@
+import type { EvidenceOptions } from '@redis-detective/evidence';
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
 import { CLI_NAME } from './cli-usage.js';
@@ -41,6 +42,8 @@ export interface RunWatchRequest {
   readonly memorySamples: number | null;
   readonly databases: readonly number[] | null;
   readonly redactKeys: boolean;
+  /** Memory-finding thresholds forwarded to each tick's diagnosis. */
+  readonly evidenceOptions?: EvidenceOptions;
   /**
    * `owner/repo` the user asked about, for the notice that says commits are not looked up here.
    * Never used to query GitHub — see the class comment.
@@ -159,6 +162,9 @@ export async function runWatch(
       memorySamples: request.memorySamples,
       databases: request.databases,
       redactKeys: request.redactKeys,
+      ...(request.evidenceOptions === undefined
+        ? {}
+        : { evidenceOptions: request.evidenceOptions }),
       repository: null,
     });
     snapshotsTaken += 1;

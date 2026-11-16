@@ -1,4 +1,5 @@
 import { buildEvidenceGraph } from '@redis-detective/evidence';
+import type { EvidenceOptions } from '@redis-detective/evidence';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
@@ -73,6 +74,10 @@ export interface RunDiagnosisRequest {
    * `LLM_API_KEY` is set; tests omit this so they never reach a provider.
    */
   readonly llmClient?: LlmClient;
+  /**
+   * Memory-finding thresholds. Omitted fields keep the evidence defaults (8 MiB and 2%).
+   */
+  readonly evidenceOptions?: EvidenceOptions;
 }
 
 function hoursFromMs(lookbackMs: number): number {
@@ -122,7 +127,11 @@ export async function runDiagnosis(request: RunDiagnosisRequest): Promise<Diagno
 
   const stored = await request.store.list();
   const snapshots = stored.map((entry) => entry.snapshot);
-  const graph = buildEvidenceGraph({ snapshots, builtAt: request.generatedAt });
+  const graph = buildEvidenceGraph({
+    snapshots,
+    builtAt: request.generatedAt,
+    ...(request.evidenceOptions === undefined ? {} : { options: request.evidenceOptions }),
+  });
   const repository = request.repository ?? null;
   const lookbackMs = request.lookbackMs ?? DEFAULT_COMMIT_LOOKBACK_HOURS * 60 * 60 * 1_000;
   const maxCommitResults = request.maxCommitResults ?? DEFAULT_MAX_COMMIT_CANDIDATES;

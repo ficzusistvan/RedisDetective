@@ -10,6 +10,8 @@ describe('resolveEvidenceOptions', () => {
   it('fills in every default', () => {
     const resolved = resolveEvidenceOptions();
 
+    expect(resolved.minGrowthBytes).toBe(8 * 1024 * 1024);
+    expect(resolved.minGrowthRatio).toBe(0.02);
     expect(resolved.minGrowthBytes).toBe(EVIDENCE_DEFAULTS.minGrowthBytes);
     expect(resolved.minGrowthRatio).toBe(EVIDENCE_DEFAULTS.minGrowthRatio);
     expect(resolved.maxAttributionsPerAnomaly).toBe(EVIDENCE_DEFAULTS.maxAttributionsPerAnomaly);

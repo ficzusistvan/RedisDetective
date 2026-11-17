@@ -49,11 +49,16 @@ Commands
                           the same threshold comparison as the CI gate. A breach notifies the
                           configured channels once, then stays quiet until --alert-cooldown
                           elapses or the condition clears (resolve).
-                          With --push, upload the directory to redis-detective-web after each
-                          sample (private Redis path).
-  push                    Upload every *.snapshot.json in --snapshots to redis-detective-web and
-                          start a diagnosis run there. Requires --web-url, --instance, and
-                          --token (or REDIS_DETECTIVE_WEB_URL / REDIS_DETECTIVE_INSTANCE /
+                          With --push, upload the snapshot just taken to redis-detective-web
+                          after each sample (private Redis path). A failed upload is reported
+                          and the next sample still runs; redis-detective push sends anything
+                          that was not accepted.
+  push                    Upload *.snapshot.json files in --snapshots that this web instance
+                          has not already accepted. Each request stays within --push-max-bytes
+                          (default 4 MiB, including multipart overhead). Snapshots older than
+                          --push-max-age (default 30d) are skipped, because the hosted app
+                          drops them. Requires --web-url, --instance, and --token (or
+                          REDIS_DETECTIVE_WEB_URL / REDIS_DETECTIVE_INSTANCE /
                           REDIS_DETECTIVE_TOKEN). No Redis connection is opened.
   test-alert              Send one sample notification per configured channel, so a webhook
   alerts test             can be verified without waiting for a real breach. Same flags as
@@ -78,8 +83,24 @@ Options
                           when big values are exhausting the --timeout budget on few keys.
       --interval <dur>    Time between watch samples: 45s, 15m, 2h, or a plain number of
                           seconds. At least ${String(MIN_WATCH_INTERVAL_MS / 1_000)}s, default ${String(DEFAULT_WATCH_INTERVAL_MS / 60_000)}m. Requires the watch command.
-      --push              After each watch sample, upload --snapshots to redis-detective-web.
+      --push              After each watch sample, upload that snapshot to
+                          redis-detective-web. A failed upload does not stop the watch.
                           Requires --web-url, --instance, and --token (or their env vars).
+      --push-all          With push, also upload snapshots this web instance has already
+                          accepted. Snapshots older than --push-max-age are still skipped.
+      --push-max-bytes <n>
+                          Largest body, in bytes, of one upload request, including multipart
+                          overhead. Default 4194304 (4 MiB), under the 4.5 MiB limit of a
+                          hosted redis-detective-web function. A single snapshot larger than
+                          this is named and not sent.
+      --push-max-age <dur>
+                          Skip snapshots older than this. Default 30d, matching hosted
+                          retention. 0 uploads every age. Accepts 30d, 12h, 45m, or a bare
+                          number of seconds.
+      --push-state-file <file>
+                          Where accepted snapshot ids are recorded, per web URL and instance,
+                          so a later push does not send them again. Default:
+                          <snapshots>/.redis-detective-push.json.
       --web-url <url>     Origin of redis-detective-web (or REDIS_DETECTIVE_WEB_URL).
       --instance <id>     Instance id on the web app (or REDIS_DETECTIVE_INSTANCE).
       --token <token>     Instance push token from the web app (or REDIS_DETECTIVE_TOKEN).

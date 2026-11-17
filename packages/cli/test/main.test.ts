@@ -9,14 +9,19 @@ import {
   EXIT_CODES,
   RedisConnectionError,
   StoredSnapshotError,
+  createMemoryPushStateStore,
   createMemorySnapshotStore,
+  estimateMultipartBodyBytes,
   main,
+  pushCandidatesFromStore,
 } from '@redis-detective/cli';
 import type {
   ConnectToRedis,
   CreateCommitSource,
+  FetchLike,
   MainContext,
   OpenSnapshotStore,
+  PushStateStore,
   WatchDeps,
 } from '@redis-detective/cli';
 import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
@@ -68,6 +73,8 @@ async function run(
     readonly alertFetch?: AlertFetch;
     readonly alertWait?: AlertWait;
     readonly openAlertStateStore?: (path: string) => AlertStateStore;
+    readonly fetch?: FetchLike;
+    readonly openPushStateStore?: (path: string) => PushStateStore;
   } = {},
 ): Promise<CapturedRun> {
   let out = '';
@@ -103,6 +110,8 @@ async function run(
       options.alertFetch ?? (() => Promise.reject(new Error('unit tests must not send alerts'))),
     alertWait: options.alertWait ?? (() => Promise.resolve()),
     openAlertStateStore: options.openAlertStateStore ?? (() => createMemoryAlertStateStore()),
+    fetch: options.fetch ?? (() => Promise.reject(new Error('unit tests must not push snapshots'))),
+    openPushStateStore: options.openPushStateStore ?? (() => createMemoryPushStateStore()),
   };
 
   const exitCode = await main(context);
@@ -829,6 +838,73 @@ describe('main', () => {
       expect(result.out).not.toContain('T000');
     });
 
+    it('keeps watching and exits zero when a push is rejected', async () => {
+      const stop = new AbortController();
+      const store = createMemorySnapshotStore([], './snaps');
+      const pushState = createMemoryPushStateStore();
+      const names: string[][] = [];
+      let pushes = 0;
+
+      const result = await run(
+        [
+          'watch',
+          '--url',
+          'redis://localhost:6379',
+          '--snapshots',
+          './snaps',
+          '--interval',
+          '15m',
+          '--push',
+          '--web-url',
+          'https://app.example.com',
+          '--instance',
+          'inst-1',
+          '--token',
+          'rdp_secret',
+        ],
+        {
+          openSnapshotStore: () => store,
+          openPushStateStore: () => pushState,
+          stopSignal: stop.signal,
+          watchDeps: {
+            wait: () => {
+              pushes += 1;
+              if (pushes >= 2) {
+                stop.abort();
+              }
+              return Promise.resolve();
+            },
+          },
+          fetch: async (_url, init) => {
+            const body = init?.body;
+            if (!(body instanceof FormData)) {
+              throw new Error('expected FormData');
+            }
+            names.push(
+              body.getAll('snapshots').map((item) => (item instanceof File ? item.name : '')),
+            );
+            if (names.length === 1) {
+              return new Response('Request Entity Too Large', { status: 413 });
+            }
+            return new Response('{"ok":true}\n', { status: 202 });
+          },
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(names).toHaveLength(2);
+      expect(names[0]).toHaveLength(1);
+      expect(names[1]).toHaveLength(1);
+      expect(names[0]?.[0]).not.toBe(names[1]?.[0]);
+      expect(result.out).toContain('Push failed:');
+      expect(result.out).toContain('HTTP 413');
+      expect(result.out).toContain('Attempted');
+      expect(result.out).toContain('Pushed 1 snapshot');
+      expect(await store.list()).toHaveLength(2);
+      const accepted = (await pushState.load()).targets[0]?.accepted.map((item) => item.name);
+      expect(accepted).toEqual(names[1]);
+    });
+
     it('refuses --warn-only on watch', async () => {
       const result = await run([
         'watch',
@@ -843,6 +919,69 @@ describe('main', () => {
 
       expect(result.exitCode).toBe(EXIT_CODES.usageError);
       expect(result.err).toContain('--warn-only');
+    });
+  });
+
+  describe('push', () => {
+    const argv = [
+      'push',
+      '--snapshots',
+      './snaps',
+      '--web-url',
+      'https://app.example.com',
+      '--instance',
+      'inst-1',
+      '--token',
+      'rdp_secret',
+    ] as const;
+
+    it('exits zero when every batch is accepted and non-zero when one fails', async () => {
+      const store = createMemorySnapshotStore(
+        [
+          snapshotFixture({ snapshotId: 'a', capturedAt: '2026-11-01T00:00:00.000Z' }),
+          snapshotFixture({ snapshotId: 'b', capturedAt: '2026-11-01T01:00:00.000Z' }),
+        ],
+        './snaps',
+      );
+      const candidates = pushCandidatesFromStore(await store.list());
+      const first = candidates[0];
+      if (first === undefined) {
+        throw new Error('expected a snapshot');
+      }
+      const oneFile = estimateMultipartBodyBytes([{ name: first.name, contents: first.contents }]);
+      const flags = [...argv, '--push-max-bytes', String(oneFile)];
+
+      const accepted = await run(flags, {
+        openSnapshotStore: () => store,
+        fetch: async () => new Response('{"ok":true}\n', { status: 202 }),
+      });
+      expect(accepted.exitCode).toBe(EXIT_CODES.ok);
+      expect(accepted.out).toContain('Pushed 2 snapshots');
+      expect(accepted.err).toBe('');
+
+      const pushState = createMemoryPushStateStore();
+      let calls = 0;
+      const partial = await run(flags, {
+        openSnapshotStore: () => store,
+        openPushStateStore: () => pushState,
+        fetch: async () => {
+          calls += 1;
+          if (calls === 1) {
+            return new Response('{"ok":true}\n', { status: 202 });
+          }
+          return new Response('Request Entity Too Large', { status: 413 });
+        },
+      });
+
+      expect(partial.exitCode).toBe(EXIT_CODES.unexpectedError);
+      expect(partial.err).toContain('Pushed 1 of 2 snapshots');
+      expect(partial.err).toContain('1 failed');
+      expect(partial.err).toContain('HTTP 413');
+      expect(partial.err).toContain('Attempted');
+      expect(partial.err).toContain(String(oneFile));
+      expect((await pushState.load()).targets[0]?.accepted.map((item) => item.snapshotId)).toEqual([
+        'a',
+      ]);
     });
   });
 

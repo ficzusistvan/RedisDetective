@@ -7,6 +7,7 @@ import {
 } from '@redis-detective/alerts';
 import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
 import { NotImplementedError } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core-types';
 import type { EvidenceOptions } from '@redis-detective/evidence';
 import {
   FindCandidateCommitsError,
@@ -25,7 +26,7 @@ import type {
 import type { LlmClient } from '@redis-detective/reasoner';
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
@@ -55,8 +56,17 @@ import { renderTextReport } from './render-text-report.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { RunDiagnosisRequest } from './run-diagnosis.js';
 import { runHealthCheck } from './run-health-check.js';
-import { pushSnapshotsToWeb, uploadFilesFromSnapshotStore } from './push-snapshots.js';
-import type { FetchLike, PushTarget } from './push-snapshots.js';
+import {
+  DEFAULT_PUSH_MAX_AGE_MS,
+  DEFAULT_PUSH_MAX_BYTES,
+  DEFAULT_PUSH_STATE_FILE_NAME,
+} from './push-defaults.js';
+import { pushCandidateFromSnapshot, pushCandidatesFromStore } from './push-snapshots.js';
+import type { FetchLike, PushResult, PushTarget } from './push-snapshots.js';
+import { createFilePushStateStore } from './push-state-store.js';
+import type { PushStateStore } from './push-state-store.js';
+import { runSnapshotPush } from './run-snapshot-push.js';
+import type { SnapshotPushReport } from './run-snapshot-push.js';
 import { runWatch } from './run-watch.js';
 import type { WatchDeps } from './run-watch.js';
 import { createFileSnapshotStore } from './snapshot-store.js';
@@ -136,6 +146,8 @@ export interface MainContext {
   readonly openAlertStateStore?: (path: string) => AlertStateStore;
   /** Injected so `push` / `watch --push` never reach the network in tests. */
   readonly fetch?: FetchLike;
+  /** Injected so push state can be exercised without a file next to the snapshot directory. */
+  readonly openPushStateStore?: (path: string) => PushStateStore;
 }
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
@@ -375,6 +387,7 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
   });
   const fetchImpl = context.fetch ?? globalThis.fetch.bind(globalThis);
   const activePush = pushTarget;
+  const pushState = activePush === null ? null : openPushState(context, snapshotDirectory, options);
 
   try {
     await runWatch(
@@ -396,10 +409,11 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
           streams.writeOut(`${line}\n`);
         },
         extraOpeningLines: formatWatchAlertBanner(alertConfig, alertSetup.configPath),
-        ...(activePush === null
+        ...(activePush === null || pushState === null
           ? {}
           : {
-              pushSnapshots: () => pushStore(store, activePush, fetchImpl),
+              pushSnapshots: (sampled) =>
+                pushOneSnapshot(sampled, activePush, pushState, options, context.now(), fetchImpl),
             }),
         afterTick: async (report) => {
           if (alertConfig.rules.length === 0) {
@@ -472,19 +486,21 @@ async function runPushCommand(context: MainContext, options: CliOptions): Promis
 
   const openStore = context.openSnapshotStore ?? createFileSnapshotStore;
   const store = openStore(snapshotDirectory);
-  const result = await pushStore(
-    store,
-    resolved.target,
-    context.fetch ?? globalThis.fetch.bind(globalThis),
-  );
-  if (result.ok) {
-    streams.writeOut(
-      `Pushed snapshots to ${resolved.target.webUrl.replace(/\/$/, '')} for instance ${resolved.target.instanceId}.\n`,
-    );
-    return EXIT_CODES.ok;
+  try {
+    const report = await runSnapshotPush({
+      target: resolved.target,
+      candidates: pushCandidatesFromStore(await store.list()),
+      stateStore: openPushState(context, snapshotDirectory, options),
+      maxBytes: options.pushMaxBytes ?? DEFAULT_PUSH_MAX_BYTES,
+      maxAgeMs: options.pushMaxAgeMs ?? DEFAULT_PUSH_MAX_AGE_MS,
+      pushAll: options.pushAll,
+      now: context.now(),
+      fetchImpl: context.fetch ?? globalThis.fetch.bind(globalThis),
+    });
+    return writePushReport(streams, report);
+  } catch (error) {
+    return reportCaughtError(streams, error);
   }
-  streams.writeError(`${result.message}\n`);
-  return EXIT_CODES.unexpectedError;
 }
 
 function resolvePushTarget(
@@ -506,12 +522,55 @@ function resolvePushTarget(
   };
 }
 
-async function pushStore(
-  store: SnapshotStore,
+function openPushState(
+  context: MainContext,
+  snapshotDirectory: string,
+  options: CliOptions,
+): PushStateStore {
+  const path = options.pushStateFile ?? join(snapshotDirectory, DEFAULT_PUSH_STATE_FILE_NAME);
+  const open = context.openPushStateStore ?? createFilePushStateStore;
+  return open(path);
+}
+
+async function pushOneSnapshot(
+  sampled: RedisSnapshot,
   target: PushTarget,
+  stateStore: PushStateStore,
+  options: CliOptions,
+  now: Date,
   fetchImpl: FetchLike,
-): Promise<Awaited<ReturnType<typeof pushSnapshotsToWeb>>> {
-  return pushSnapshotsToWeb(target, await uploadFilesFromSnapshotStore(store), fetchImpl);
+): Promise<PushResult> {
+  const report = await runSnapshotPush({
+    target,
+    candidates: [pushCandidateFromSnapshot(sampled)],
+    stateStore,
+    maxBytes: options.pushMaxBytes ?? DEFAULT_PUSH_MAX_BYTES,
+    maxAgeMs: options.pushMaxAgeMs ?? DEFAULT_PUSH_MAX_AGE_MS,
+    pushAll: options.pushAll,
+    now,
+    fetchImpl,
+  });
+  return pushResultFromReport(report);
+}
+
+function pushResultFromReport(report: SnapshotPushReport): PushResult {
+  const text = [report.summary, ...report.details].filter((line) => line !== '').join('\n');
+  if (report.ok) {
+    return { ok: true, message: text };
+  }
+  return { ok: false, status: report.status, message: text };
+}
+
+function writePushReport(streams: MainStreams, report: SnapshotPushReport): ExitCode {
+  if (report.ok) {
+    streams.writeOut(`${report.summary}\n`);
+    return EXIT_CODES.ok;
+  }
+  streams.writeError(`${report.summary}\n`);
+  for (const line of report.details) {
+    streams.writeError(`${line}\n`);
+  }
+  return EXIT_CODES.unexpectedError;
 }
 
 async function runTestAlertCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {

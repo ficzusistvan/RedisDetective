@@ -1,3 +1,4 @@
+import type { RedisSnapshot } from '@redis-detective/core-types';
 import type { EvidenceOptions } from '@redis-detective/evidence';
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
@@ -63,10 +64,11 @@ export interface RunWatchRequest {
    */
   readonly afterTick?: (report: DiagnosisReport) => Promise<void>;
   /**
-   * When set, called after each saved sample so a long watch can upload to redis-detective-web.
-   * A failed push never aborts the session; the next interval can try again.
+   * When set, called with the snapshot just saved so a long watch can upload that sample to
+   * redis-detective-web. A failed push never aborts the session; the next interval still samples.
+   * Catching a throw here is what keeps a transport bug from ending the loop.
    */
-  readonly pushSnapshots?: () => Promise<PushResult>;
+  readonly pushSnapshots?: (sampled: RedisSnapshot) => Promise<PushResult>;
   /** Extra lines after the standard "Watching …" banner (alert channel summary). */
   readonly extraOpeningLines?: readonly string[];
 }
@@ -88,7 +90,7 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     'One line per sample, not the full report. Ctrl-C stops after the sample in flight.',
   ];
   if (request.pushSnapshots !== undefined) {
-    lines.push('After each sample, snapshots are pushed to redis-detective-web.');
+    lines.push('After each sample, that snapshot is pushed to redis-detective-web.');
   }
   if (request.repository !== null) {
     lines.push(
@@ -103,7 +105,7 @@ function openingLines(request: RunWatchRequest): readonly string[] {
 
 function pushLine(result: PushResult): string {
   if (result.ok) {
-    return 'Pushed snapshots to the web app.';
+    return result.message ?? 'Pushed snapshots to the web app.';
   }
   if (result.status === 409) {
     return `Push skipped: ${result.message}`;
@@ -195,7 +197,13 @@ export async function runWatch(
     }
 
     if (request.pushSnapshots !== undefined) {
-      writeLine(pushLine(await request.pushSnapshots()));
+      try {
+        writeLine(pushLine(await request.pushSnapshots(sampled)));
+      } catch (error: unknown) {
+        const detail =
+          error instanceof Error && error.message !== '' ? error.message : 'unknown error';
+        writeLine(`Push failed: ${detail}`);
+      }
     }
 
     if (stopSignal.aborted) {

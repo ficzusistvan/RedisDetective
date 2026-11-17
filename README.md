@@ -84,8 +84,8 @@ state is a small JSON file next to the snapshots so a restart does not re-page. 
 
 ## Optional: push snapshots to redis-detective-web
 
-When Redis is not reachable from the hosted app, sample locally and upload the snapshot
-directory with a push token from the instance page:
+When Redis is not reachable from the hosted app, sample locally and upload with a push token
+from the instance page:
 
 ```bash
 redis-detective push \
@@ -95,7 +95,26 @@ redis-detective push \
   --token <push-token>
 ```
 
-Or push after every `watch` sample:
+`push` sends snapshots this web URL and instance have not already accepted. Accepted ids are
+recorded in `<snapshots>/.redis-detective-push.json` (override with `--push-state-file`). A
+later `push` skips those ids. `--push-all` uploads them again.
+
+Requests are split so each body stays within `--push-max-bytes` (default 4 MiB, including
+multipart overhead). That sits under the 4.5 MiB limit of a hosted function, which otherwise
+rejects the whole directory with `FUNCTION_PAYLOAD_TOO_LARGE` once `watch` has been running for
+a day or two. A snapshot file that cannot fit in one request is named and left unsent.
+
+Snapshots older than `--push-max-age` (default 30 days) are not uploaded. The hosted app drops
+stored snapshots older than 30 days, so sending them only spends the request. `0` uploads every
+age.
+
+If the server answers HTTP 413, the error names the batch and the size that was attempted.
+A partial upload reports how many snapshots were accepted and how many failed (for example
+`Pushed 40 of 52 snapshots …; 12 failed.`) and exits non-zero when anything failed. Snapshots
+the server accepted are not sent again. Retrying a batch that did not get a success response is
+safe: the CLI filename is fixed by the snapshot, and the hosted app overwrites that filename.
+
+Or upload each new sample while watching:
 
 ```bash
 redis-detective watch \
@@ -106,6 +125,10 @@ redis-detective watch \
   --instance <instance-id> \
   --token <push-token>
 ```
+
+`watch --push` uploads the snapshot that tick just took, not the directory. A failed upload is
+printed and the watch keeps sampling. Run `push` afterwards to send any snapshot that was not
+accepted.
 
 `--web-url`, `--instance`, and `--token` also read `REDIS_DETECTIVE_WEB_URL`,
 `REDIS_DETECTIVE_INSTANCE`, and `REDIS_DETECTIVE_TOKEN`. Prefer `--redact-keys` before a push

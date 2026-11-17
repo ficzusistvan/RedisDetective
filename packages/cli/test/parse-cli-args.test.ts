@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CliUsageError, parseCliArgs } from '@redis-detective/cli';
+import { CliUsageError, HELP_TEXT, parseCliArgs } from '@redis-detective/cli';
 
 describe('parseCliArgs --skip-gh', () => {
   it('defaults to consulting gh, and turns that off from the flag or the env', () => {
@@ -48,6 +48,42 @@ describe('parseCliArgs push', () => {
     expect(fromEnv.webUrl).toBe('https://app.example.com');
     expect(fromEnv.instanceId).toBe('inst-1');
     expect(fromEnv.token).toBe('rdp_secret');
+    expect(fromFlags.pushAll).toBe(false);
+    expect(fromFlags.pushMaxBytes).toBeNull();
+    expect(fromFlags.pushMaxAgeMs).toBeNull();
+    expect(fromFlags.pushStateFile).toBeNull();
+  });
+
+  it('reads batch, age, and re-upload flags', () => {
+    const options = parseCliArgs([
+      'push',
+      '--snapshots',
+      './snaps',
+      '--push-all',
+      '--push-max-bytes',
+      '1000000',
+      '--push-max-age',
+      '30d',
+      '--push-state-file',
+      './snaps/state.json',
+    ]);
+
+    expect(options.pushAll).toBe(true);
+    expect(options.pushMaxBytes).toBe(1_000_000);
+    expect(options.pushMaxAgeMs).toBe(30 * 24 * 60 * 60 * 1_000);
+    expect(options.pushStateFile).toBe('./snaps/state.json');
+    expect(parseCliArgs(['--push-max-age', '0']).pushMaxAgeMs).toBe(0);
+    expect(parseCliArgs(['--push-max-age', '12h']).pushMaxAgeMs).toBe(12 * 60 * 60 * 1_000);
+    expect(() => parseCliArgs(['--push-max-bytes', '0'])).toThrow(CliUsageError);
+    expect(() => parseCliArgs(['--push-max-age', '30 days'])).toThrow(CliUsageError);
+  });
+
+  it('documents batched push in the help text', () => {
+    expect(HELP_TEXT).toContain('--push-max-bytes');
+    expect(HELP_TEXT).toContain('--push-max-age');
+    expect(HELP_TEXT).toContain('--push-all');
+    expect(HELP_TEXT).toContain('--push-state-file');
+    expect(HELP_TEXT).toContain('4 MiB');
   });
 });
 

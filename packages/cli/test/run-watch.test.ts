@@ -48,11 +48,7 @@ function watchRequest(
 }
 
 /** Records each sleep and stops the loop once `stopAfter` of them have been asked for. */
-function stopAfterIntervals(
-  stop: AbortController,
-  stopAfter: number,
-  waits: number[],
-): WatchDeps {
+function stopAfterIntervals(stop: AbortController, stopAfter: number, waits: number[]): WatchDeps {
   return {
     wait: (ms) => {
       waits.push(ms);
@@ -69,10 +65,7 @@ describe('runWatch', () => {
     const stop = new AbortController();
     const waits: number[] = [];
 
-    const summary = await runWatch(
-      watchRequest(stop),
-      stopAfterIntervals(stop, 3, waits),
-    );
+    const summary = await runWatch(watchRequest(stop), stopAfterIntervals(stop, 3, waits));
 
     expect(summary.snapshotsTaken).toBe(3);
     expect(summary.snapshotsInStore).toBe(3);
@@ -178,9 +171,7 @@ describe('runWatch', () => {
     );
     const printed = lines.join('\n');
 
-    expect(lines[0]).toBe(
-      'Watching redis://redis.example.com:6379 every 15m, saving to memory.',
-    );
+    expect(lines[0]).toBe('Watching redis://redis.example.com:6379 every 15m, saving to memory.');
     expect(printed).toContain('makes no GitHub requests');
     expect(lines.at(-1)).toBe(
       'Full diagnosis: redis-detective --snapshots memory --repo acme/checkout',
@@ -211,8 +202,36 @@ describe('runWatch', () => {
     );
 
     expect(pushes).toEqual([1, 2]);
-    expect(lines.join('\n')).toContain('After each sample, snapshots are pushed to redis-detective-web.');
+    expect(lines.join('\n')).toContain(
+      'After each sample, that snapshot is pushed to redis-detective-web.',
+    );
     expect(lines).toContain('Push skipped: A run is already in progress for this instance.');
     expect(lines).toContain('Pushed snapshots to the web app.');
+  });
+
+  it('keeps watching when a push throws', async () => {
+    const stop = new AbortController();
+    const lines: string[] = [];
+    let pushes = 0;
+
+    const summary = await runWatch(
+      watchRequest(stop, {
+        writeLine: (line) => lines.push(line),
+        pushSnapshots: () => {
+          pushes += 1;
+          if (pushes === 1) {
+            return Promise.reject(new Error('socket hang up'));
+          }
+          return Promise.resolve({ ok: true, message: 'Pushed 1 snapshot to the web app.' });
+        },
+      }),
+      stopAfterIntervals(stop, 2, []),
+    );
+
+    expect(pushes).toBe(2);
+    expect(summary.snapshotsTaken).toBe(2);
+    expect(lines).toContain('Push failed: socket hang up');
+    expect(lines).toContain('Pushed 1 snapshot to the web app.');
+    expect(lines.some((line) => line.startsWith('Stopped.'))).toBe(true);
   });
 });

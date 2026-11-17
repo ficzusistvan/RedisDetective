@@ -86,8 +86,20 @@ export interface CliOptions {
   readonly instanceId: string | null;
   /** Push token for the web app. `null` until `--token` or `REDIS_DETECTIVE_TOKEN`. */
   readonly token: string | null;
-  /** When true on `watch`, push the snapshot directory after each sample. */
+  /** When true on `watch`, push the snapshot just taken after each sample. */
   readonly push: boolean;
+  /**
+   * Largest upload body in bytes, including multipart overhead. `null` uses the 4 MiB default.
+   */
+  readonly pushMaxBytes: number | null;
+  /**
+   * Skip snapshots older than this. `null` uses 30 days. `0` uploads every age.
+   */
+  readonly pushMaxAgeMs: number | null;
+  /** Re-upload snapshots the state file already lists as accepted. */
+  readonly pushAll: boolean;
+  /** Override for the push-state file. `null` uses `<snapshots>/.redis-detective-push.json`. */
+  readonly pushStateFile: string | null;
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -139,6 +151,10 @@ interface MutableCliOptions {
   instanceId: string | null;
   token: string | null;
   push: boolean;
+  pushMaxBytes: number | null;
+  pushMaxAgeMs: number | null;
+  pushAll: boolean;
+  pushStateFile: string | null;
   help: boolean;
   version: boolean;
 }
@@ -194,6 +210,34 @@ function parseDurationMs(flag: string, raw: string): number {
     );
   }
   return Number(digits) * unitToMs(match?.[2] ?? 's');
+}
+
+/**
+ * Same shapes as a watch interval, plus days, because retention is measured in days.
+ * A bare number is seconds, matching `--interval`. `0` keeps every age.
+ */
+function parsePushMaxAgeMs(flag: string, raw: string): number {
+  const match = /^(\d+)(s|m|h|d)?$/.exec(raw.trim());
+  const digits = match?.[1];
+  if (digits === undefined) {
+    throw new CliUsageError(
+      `${flag} expects a duration such as 30d, 12h or 45m, or 0 to upload every age, received "${raw}".`,
+    );
+  }
+  return Number(digits) * pushAgeUnitMs(match?.[2] ?? 's');
+}
+
+function pushAgeUnitMs(unit: string): number {
+  switch (unit) {
+    case 'd':
+      return 24 * 60 * 60 * 1_000;
+    case 'h':
+      return 60 * 60 * 1_000;
+    case 'm':
+      return 60 * 1_000;
+    default:
+      return 1_000;
+  }
 }
 
 function parseWatchInterval(flag: string, raw: string): number {
@@ -283,6 +327,10 @@ export function parseCliArgs(
     instanceId: null,
     token: null,
     push: false,
+    pushMaxBytes: null,
+    pushMaxAgeMs: null,
+    pushAll: false,
+    pushStateFile: null,
     help: false,
     version: false,
   };
@@ -467,6 +515,31 @@ export function parseCliArgs(
       case '--push':
         options.push = true;
         break;
+
+      case '--push-all':
+        options.pushAll = true;
+        break;
+
+      case '--push-max-bytes': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushMaxBytes = parsePositiveInteger(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--push-max-age': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushMaxAgeMs = parsePushMaxAgeMs(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--push-state-file': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushStateFile = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
 
       case '--web-url': {
         const [value, nextIndex] = takeValue(flag, inlineValue, index);

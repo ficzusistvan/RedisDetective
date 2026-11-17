@@ -57,14 +57,15 @@ describe('summarizeEvidenceDeterministically', () => {
     expect(explanation.likelyCause?.pattern).toBe('cart:items:*');
     expect(explanation.headline).toContain('cart:items:*');
     expect(explanation.headline).toContain('expir');
-    expect(explanation.hintedCandidateShas).toEqual([
-      'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    ]);
+    expect(explanation.hintedCandidateShas).toEqual(['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']);
     expect(explanation.evidenceStrength).toBe('strong');
     expect(explanation.recommendedActions.length).toBeGreaterThan(0);
-    expect(
-      validateExplanationAgainstEvidence(explanation, leakingReasonerInput()).valid,
-    ).toBe(true);
+    expect(explanation.summary).toContain('2026-08-25 10:00 UTC');
+    expect(explanation.headline).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(explanation.summary).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(validateExplanationAgainstEvidence(explanation, leakingReasonerInput()).valid).toBe(
+      true,
+    );
   });
 
   it('does not put unhinted commits into hintedCandidateShas', () => {
@@ -103,6 +104,57 @@ describe('summarizeEvidenceDeterministically', () => {
     expect(explanation.evidenceStrength).toBe('unclear');
     expect(explanation.headline).toContain('Not enough snapshots');
     expect(explanation.unknowns[0]).toContain('two snapshots');
+    expect(explanation.summary).toContain('2026-08-25 10:00 UTC');
+    expect(explanation.summary).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('reserves the no-growth headline for a window whose stored size did not change', () => {
+    const explanation = summarizeEvidenceDeterministically(
+      reasonerInputFixture({
+        graph: evidenceGraphFixture({
+          gaps: [
+            {
+              kind: 'no-growth-detected',
+              detail:
+                'No memory growth was found across 3 snapshots from 2026-11-14 03:30 UTC to 2026-11-14 04:32 UTC.',
+              remedy: null,
+            },
+          ],
+          window: { from: '2026-11-14T03:30:00.000Z', to: '2026-11-14T04:32:00.000Z' },
+        }),
+      }),
+    );
+
+    expect(explanation.headline).toBe('No memory growth was found in this window.');
+    expect(explanation.likelyCause).toBeNull();
+    expect(explanation.evidenceStrength).toBe('unclear');
+    expect(explanation.summary).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('states a sub-threshold rise instead of claiming that nothing grew', () => {
+    const detail =
+      'Memory grew 10 MiB (+1%), below anomaly thresholds (8 MiB and 2%). session:* contributed the most estimated growth, 8 MiB, as more keys. Across 3 snapshots from 2026-11-14 03:30 UTC to 2026-11-14 04:32 UTC.';
+    const explanation = summarizeEvidenceDeterministically(
+      reasonerInputFixture({
+        graph: evidenceGraphFixture({
+          gaps: [{ kind: 'no-growth-detected', detail, remedy: null }],
+          window: { from: '2026-11-14T03:30:00.000Z', to: '2026-11-14T04:32:00.000Z' },
+        }),
+      }),
+    );
+
+    expect(explanation.headline).toBe(
+      'Memory grew 10 MiB (+1%), below anomaly thresholds (8 MiB and 2%).',
+    );
+    expect(explanation.headline).not.toBe('No memory growth was found in this window.');
+    expect(explanation.summary).toContain(
+      'session:* contributed the most estimated growth, 8 MiB, as more keys',
+    );
+    expect(explanation.summary).toContain('2026-11-14 03:30 UTC');
+    expect(explanation.summary).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+    expect(explanation.summary).not.toContain('8388608');
+    expect(explanation.likelyCause).toBeNull();
+    expect(explanation.evidenceStrength).toBe('unclear');
   });
 });
 

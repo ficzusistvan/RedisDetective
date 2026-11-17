@@ -1,5 +1,5 @@
 /** Which command the user invoked. `report` is the default when no subcommand is given. */
-export type CliCommand = 'report' | 'watch' | 'test-alert';
+export type CliCommand = 'report' | 'watch' | 'test-alert' | 'push';
 
 export interface ParsedCommand {
   readonly command: CliCommand;
@@ -22,6 +22,9 @@ export interface ParsedCommand {
 export function commandFromArgv(argv: readonly string[]): ParsedCommand {
   if (argv[0] === 'watch') {
     return { command: 'watch', flags: argv.slice(1) };
+  }
+  if (argv[0] === 'push') {
+    return { command: 'push', flags: argv.slice(1) };
   }
   if (argv[0] === 'test-alert') {
     return { command: 'test-alert', flags: argv.slice(1) };

@@ -135,6 +135,41 @@ export type { RunWatchRequest, WatchDeps, WatchSummary } from './run-watch.js';
 export { formatWatchTick } from './format-watch-tick.js';
 export type { WatchTick } from './format-watch-tick.js';
 
+export { DEFAULT_PUSH_MAX_AGE_MS, DEFAULT_PUSH_MAX_BYTES } from './push-defaults.js';
+export { estimateMultipartBodyBytes } from './estimate-upload-bytes.js';
+export { packSnapshotBatches } from './pack-snapshot-batches.js';
+export type { PackedSnapshotBatches } from './pack-snapshot-batches.js';
+export {
+  pushCandidateFromSnapshot,
+  pushCandidatesFromStore,
+  pushSnapshotsToWeb,
+  uploadFilesFromSnapshotStore,
+  uploadFilesFromStore,
+} from './push-snapshots.js';
+export type {
+  FetchLike,
+  PushCandidate,
+  PushResult,
+  PushTarget,
+  SnapshotUploadFile,
+} from './push-snapshots.js';
+export {
+  PUSH_STATE_SCHEMA_VERSION,
+  PushStateError,
+  createFilePushStateStore,
+  createMemoryPushStateStore,
+  emptyPushState,
+  parsePushState,
+} from './push-state-store.js';
+export type {
+  AcceptedSnapshot,
+  PushState,
+  PushStateStore,
+  PushTargetRecord,
+} from './push-state-store.js';
+export { runSnapshotPush } from './run-snapshot-push.js';
+export type { RunSnapshotPushRequest, SnapshotPushReport } from './run-snapshot-push.js';
+
 export { evaluateAlertRules } from './evaluate-alert-rules.js';
 export { formatWatchAlertBanner } from './format-watch-alert-banner.js';
 export { resolveAlertConfig } from './resolve-alert-config.js';

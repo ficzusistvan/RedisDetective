@@ -19,8 +19,8 @@ function gapKinds(snapshots: readonly RedisSnapshot[]): readonly EvidenceGapKind
 /**
  * A TTL leak on `cart:items:*` that grows the instance gradually over four hours.
  *
- * Each interval rises by well under `stepChangeRatio`, so this is the sustained-trend shape rather
- * than the deploy-shaped jump — a slow leak is what the product is really for.
+ * The run rises at every snapshot, so this is the sustained-trend shape rather than a
+ * one-interval step — a slow leak is what the product is really for.
  */
 function leakingSeries(): readonly RedisSnapshot[] {
   const coverage = [100, 70, 30, 0];
@@ -118,6 +118,10 @@ describe('buildEvidenceGraph', () => {
       // Nothing for the user to do about it, so no remedy is offered.
       expect(graph.gaps[0]?.remedy).toBeNull();
       expect(graph.gaps[0]?.detail).toContain('3 snapshots');
+      expect(graph.gaps[0]?.detail).toContain('No memory growth was found');
+      expect(graph.gaps[0]?.detail).toContain('2026-08-25 10:00 UTC');
+      expect(graph.gaps[0]?.detail).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+      expect(graph.gaps[0]?.detail).not.toContain('8388608');
     });
 
     it('always has either a finding or a gap', () => {
@@ -312,8 +316,133 @@ describe('buildEvidenceGraph', () => {
       buildEvidenceGraph({
         snapshots,
         builtAt: BUILT_AT,
-        options: { minGrowthBytes: 1_024, stepChangeRatio: 0.01 },
+        options: { minGrowthBytes: 1_024, minGrowthRatio: 0.01 },
       }).anomalies,
     ).toHaveLength(1);
   });
+
+  it('names the pattern behind a ~5% rise on a ~909 MiB instance', () => {
+    const graph = build(largeInstanceSeries());
+
+    expect(graph.anomalies.map((anomaly) => anomaly.kind)).toEqual(['memory-growth']);
+    expect(graph.attributions.map((attribution) => attribution.pattern)).toEqual(['session:*']);
+    expect(graph.attributions.map((attribution) => attribution.mechanism)).toContain('more-keys');
+    expect(graph.gaps.map((gap) => gap.kind)).not.toContain('no-growth-detected');
+    expect(JSON.stringify(graph.gaps)).not.toContain('8388608');
+  });
+
+  it('says a rise under 8 MiB or 2% is below the anomaly thresholds and names the contributing pattern', () => {
+    const graph = build(belowThresholdSeries());
+    const gap = graph.gaps.find((entry) => entry.kind === 'no-growth-detected');
+
+    expect(graph.anomalies).toEqual([]);
+    expect(graph.attributions).toEqual([]);
+    expect(gap?.detail).toBe(
+      'Memory grew 10 MiB (+1%), below anomaly thresholds (8 MiB and 2%). session:* contributed the most estimated growth, 8 MiB, as more keys. Across 3 snapshots from 2026-11-14 03:30 UTC to 2026-11-14 04:32 UTC.',
+    );
+    expect(gap?.detail).not.toContain('cache:*');
+    expect(gap?.detail).not.toContain('8388608');
+    expect(gap?.detail).not.toMatch(/\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('says memory fell when stored size shrank', () => {
+    const graph = build([
+      snapshotFixture({
+        snapshotId: 'a',
+        capturedAt: '2026-11-14T03:30:00.000Z',
+        usedMemoryBytes: 64 * MB,
+        memory: { usedMemoryDatasetBytes: 64 * MB },
+        patterns: [],
+      }),
+      snapshotFixture({
+        snapshotId: 'b',
+        capturedAt: '2026-11-14T04:32:00.000Z',
+        usedMemoryBytes: 60 * MB,
+        memory: { usedMemoryDatasetBytes: 60 * MB },
+        patterns: [],
+      }),
+    ]);
+    const gap = graph.gaps.find((entry) => entry.kind === 'no-growth-detected');
+
+    expect(gap?.detail.startsWith('Memory fell ')).toBe(true);
+    expect(gap?.detail).not.toContain('No memory growth was found');
+    expect(gap?.detail).toContain('2026-11-14 03:30 UTC');
+  });
 });
+
+const MIB = MB;
+
+function storedPoint(
+  index: number,
+  bytes: number,
+  capturedAt: string,
+  patterns: ReturnType<typeof patternFixture>[],
+) {
+  return snapshotFixture({
+    snapshotId: `snapshot-${index + 1}`,
+    capturedAt,
+    usedMemoryBytes: bytes,
+    memory: { usedMemoryDatasetBytes: bytes },
+    keyCount: 100_000,
+    patterns,
+  });
+}
+
+/** ~909 MiB rising ~46.9 MiB / ~5.2% across five snapshots. session:* holds most of the bytes. */
+function largeInstanceSeries(): readonly RedisSnapshot[] {
+  const start = 909 * MIB;
+  const total = Math.round(46.9 * MIB);
+  const at = [
+    '2026-11-14T03:30:00.000Z',
+    '2026-11-14T03:45:00.000Z',
+    '2026-11-14T04:00:00.000Z',
+    '2026-11-14T04:15:00.000Z',
+    '2026-11-14T04:32:00.000Z',
+  ];
+
+  return at.map((capturedAt, index) => {
+    const progress = index / 4;
+    return storedPoint(index, start + Math.round((total * index) / 4), capturedAt, [
+      patternFixture({
+        pattern: 'session:*',
+        estimatedBytes: Math.round((80 + 40 * progress) * MIB),
+        estimatedKeyCount: Math.round(8_000 + 8_000 * progress),
+        keysWithTtl: 100,
+        keysWithoutTtl: 0,
+      }),
+      patternFixture({
+        pattern: 'cache:*',
+        estimatedBytes: Math.round((8 + 2 * progress) * MIB),
+        estimatedKeyCount: Math.round(1_000 + 100 * progress),
+        keysWithTtl: 80,
+        keysWithoutTtl: 20,
+      }),
+    ]);
+  });
+}
+
+/** +10 MiB / +1% on 1000 MiB. Clears 8 MiB, misses 2%. session:* explains most of it. */
+function belowThresholdSeries(): readonly RedisSnapshot[] {
+  const at = ['2026-11-14T03:30:00.000Z', '2026-11-14T04:00:00.000Z', '2026-11-14T04:32:00.000Z'];
+  const memory = [1000, 1005, 1010];
+
+  return at.map((capturedAt, index) => {
+    const progress = index / 2;
+    return storedPoint(index, (memory[index] ?? 1000) * MIB, capturedAt, [
+      patternFixture({
+        pattern: 'session:*',
+        estimatedBytes: Math.round((20 + 8 * progress) * MIB),
+        estimatedKeyCount: Math.round(1_000 + 3_000 * progress),
+        keysWithTtl: 100,
+        keysWithoutTtl: 0,
+      }),
+      patternFixture({
+        pattern: 'cache:*',
+        estimatedBytes: Math.round((5 + progress) * MIB),
+        estimatedKeyCount: Math.round(1_000 + 50 * progress),
+        keysWithTtl: 80,
+        keysWithoutTtl: 20,
+      }),
+    ]);
+  });
+}

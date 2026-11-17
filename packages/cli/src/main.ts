@@ -7,6 +7,8 @@ import {
 } from '@redis-detective/alerts';
 import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
 import { NotImplementedError } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { EvidenceOptions } from '@redis-detective/evidence';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
@@ -24,7 +26,7 @@ import type {
 import type { LlmClient } from '@redis-detective/reasoner';
 
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
@@ -54,6 +56,17 @@ import { renderTextReport } from './render-text-report.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { RunDiagnosisRequest } from './run-diagnosis.js';
 import { runHealthCheck } from './run-health-check.js';
+import {
+  DEFAULT_PUSH_MAX_AGE_MS,
+  DEFAULT_PUSH_MAX_BYTES,
+  DEFAULT_PUSH_STATE_FILE_NAME,
+} from './push-defaults.js';
+import { pushCandidateFromSnapshot, pushCandidatesFromStore } from './push-snapshots.js';
+import type { FetchLike, PushResult, PushTarget } from './push-snapshots.js';
+import { createFilePushStateStore } from './push-state-store.js';
+import type { PushStateStore } from './push-state-store.js';
+import { runSnapshotPush } from './run-snapshot-push.js';
+import type { SnapshotPushReport } from './run-snapshot-push.js';
 import { runWatch } from './run-watch.js';
 import type { WatchDeps } from './run-watch.js';
 import { createFileSnapshotStore } from './snapshot-store.js';
@@ -131,6 +144,10 @@ export interface MainContext {
   readonly alertFetch?: AlertFetch;
   readonly alertWait?: AlertWait;
   readonly openAlertStateStore?: (path: string) => AlertStateStore;
+  /** Injected so `push` / `watch --push` never reach the network in tests. */
+  readonly fetch?: FetchLike;
+  /** Injected so push state can be exercised without a file next to the snapshot directory. */
+  readonly openPushStateStore?: (path: string) => PushStateStore;
 }
 
 const DEFAULT_CONNECT_TIMEOUT_MS = 5_000;
@@ -174,6 +191,17 @@ export async function main(context: MainContext): Promise<ExitCode> {
 
   if (options.command === 'watch') {
     return runWatchCommand(context, options);
+  }
+
+  if (options.command === 'push') {
+    return runPushCommand(context, options);
+  }
+
+  if (options.push) {
+    streams.writeError(
+      `--push requires the watch subcommand, or use ${CLI_NAME} push --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`,
+    );
+    return EXIT_CODES.usageError;
   }
 
   if (options.command === 'test-alert') {
@@ -313,7 +341,18 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     return EXIT_CODES.usageError;
   }
 
+  let pushTarget: PushTarget | null = null;
+  if (options.push) {
+    const resolved = resolvePushTarget(options);
+    if (resolved.ok === false) {
+      streams.writeError(resolved.message);
+      return EXIT_CODES.usageError;
+    }
+    pushTarget = resolved.target;
+  }
+
   const openStore = context.openSnapshotStore ?? createFileSnapshotStore;
+  const store = openStore(snapshotDirectory);
   const target = redactRedisUrl(options.redisUrl);
   const connected = await openConnection(context, options.redisUrl, target);
   if (connected.ok === false) {
@@ -346,11 +385,14 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
     fetchImpl: alertFetch,
     ...(context.alertWait === undefined ? {} : { wait: context.alertWait }),
   });
+  const fetchImpl = context.fetch ?? globalThis.fetch.bind(globalThis);
+  const activePush = pushTarget;
+  const pushState = activePush === null ? null : openPushState(context, snapshotDirectory, options);
 
   try {
     await runWatch(
       {
-        store: openStore(snapshotDirectory),
+        store,
         client: connected.connection.client,
         target,
         intervalMs: options.intervalMs ?? DEFAULT_WATCH_INTERVAL_MS,
@@ -359,6 +401,7 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
         memorySamples: options.memorySamples,
         databases: options.databases,
         redactKeys: options.redactKeys,
+        ...evidenceOptionsField(options),
         repository: options.repository,
         now: context.now,
         stopSignal: context.stopSignal ?? new AbortController().signal,
@@ -366,6 +409,12 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
           streams.writeOut(`${line}\n`);
         },
         extraOpeningLines: formatWatchAlertBanner(alertConfig, alertSetup.configPath),
+        ...(activePush === null || pushState === null
+          ? {}
+          : {
+              pushSnapshots: (sampled) =>
+                pushOneSnapshot(sampled, activePush, pushState, options, context.now(), fetchImpl),
+            }),
         afterTick: async (report) => {
           if (alertConfig.rules.length === 0) {
             return;
@@ -416,6 +465,112 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
   } finally {
     await connected.connection.close();
   }
+}
+
+async function runPushCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {
+  const { streams } = context;
+  const snapshotDirectory = options.snapshotDirectory;
+  if (snapshotDirectory === null) {
+    streams.writeError(`push requires --snapshots <dir>.\nRun ${CLI_NAME} --help for usage.\n`);
+    return EXIT_CODES.usageError;
+  }
+  const resolved = resolvePushTarget(options);
+  if (resolved.ok === false) {
+    streams.writeError(resolved.message);
+    return EXIT_CODES.usageError;
+  }
+  if (options.outputFormat !== 'text') {
+    streams.writeError(`push has no report output, so --format / --json do not apply.\n`);
+    return EXIT_CODES.usageError;
+  }
+
+  const openStore = context.openSnapshotStore ?? createFileSnapshotStore;
+  const store = openStore(snapshotDirectory);
+  try {
+    const report = await runSnapshotPush({
+      target: resolved.target,
+      candidates: pushCandidatesFromStore(await store.list()),
+      stateStore: openPushState(context, snapshotDirectory, options),
+      maxBytes: options.pushMaxBytes ?? DEFAULT_PUSH_MAX_BYTES,
+      maxAgeMs: options.pushMaxAgeMs ?? DEFAULT_PUSH_MAX_AGE_MS,
+      pushAll: options.pushAll,
+      now: context.now(),
+      fetchImpl: context.fetch ?? globalThis.fetch.bind(globalThis),
+    });
+    return writePushReport(streams, report);
+  } catch (error) {
+    return reportCaughtError(streams, error);
+  }
+}
+
+function resolvePushTarget(
+  options: CliOptions,
+): { ok: true; target: PushTarget } | { ok: false; message: string } {
+  if (options.webUrl === null || options.instanceId === null || options.token === null) {
+    return {
+      ok: false,
+      message: `Push needs --web-url, --instance, and --token (or REDIS_DETECTIVE_WEB_URL, REDIS_DETECTIVE_INSTANCE, and REDIS_DETECTIVE_TOKEN).\nRun ${CLI_NAME} --help for usage.\n`,
+    };
+  }
+  return {
+    ok: true,
+    target: {
+      webUrl: options.webUrl,
+      instanceId: options.instanceId,
+      token: options.token,
+    },
+  };
+}
+
+function openPushState(
+  context: MainContext,
+  snapshotDirectory: string,
+  options: CliOptions,
+): PushStateStore {
+  const path = options.pushStateFile ?? join(snapshotDirectory, DEFAULT_PUSH_STATE_FILE_NAME);
+  const open = context.openPushStateStore ?? createFilePushStateStore;
+  return open(path);
+}
+
+async function pushOneSnapshot(
+  sampled: RedisSnapshot,
+  target: PushTarget,
+  stateStore: PushStateStore,
+  options: CliOptions,
+  now: Date,
+  fetchImpl: FetchLike,
+): Promise<PushResult> {
+  const report = await runSnapshotPush({
+    target,
+    candidates: [pushCandidateFromSnapshot(sampled)],
+    stateStore,
+    maxBytes: options.pushMaxBytes ?? DEFAULT_PUSH_MAX_BYTES,
+    maxAgeMs: options.pushMaxAgeMs ?? DEFAULT_PUSH_MAX_AGE_MS,
+    pushAll: options.pushAll,
+    now,
+    fetchImpl,
+  });
+  return pushResultFromReport(report);
+}
+
+function pushResultFromReport(report: SnapshotPushReport): PushResult {
+  const text = [report.summary, ...report.details].filter((line) => line !== '').join('\n');
+  if (report.ok) {
+    return { ok: true, message: text };
+  }
+  return { ok: false, status: report.status, message: text };
+}
+
+function writePushReport(streams: MainStreams, report: SnapshotPushReport): ExitCode {
+  if (report.ok) {
+    streams.writeOut(`${report.summary}\n`);
+    return EXIT_CODES.ok;
+  }
+  streams.writeError(`${report.summary}\n`);
+  for (const line of report.details) {
+    streams.writeError(`${line}\n`);
+  }
+  return EXIT_CODES.unexpectedError;
 }
 
 async function runTestAlertCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {
@@ -470,6 +625,18 @@ async function runTestAlertCommand(context: MainContext, options: CliOptions): P
   }
 }
 
+function evidenceOptionsField(options: CliOptions): { readonly evidenceOptions?: EvidenceOptions } {
+  if (options.minGrowthBytes === null && options.minGrowthRatio === null) {
+    return {};
+  }
+  return {
+    evidenceOptions: {
+      ...(options.minGrowthBytes === null ? {} : { minGrowthBytes: options.minGrowthBytes }),
+      ...(options.minGrowthRatio === null ? {} : { minGrowthRatio: options.minGrowthRatio }),
+    },
+  };
+}
+
 async function runDiagnosisCommand(
   context: MainContext,
   options: CliOptions,
@@ -496,6 +663,7 @@ async function runDiagnosisCommand(
     memorySamples: options.memorySamples,
     databases: options.databases,
     redactKeys: options.redactKeys,
+    ...evidenceOptionsField(options),
     repository: repositoryResult.repository,
     lookbackMs: (options.lookbackHours ?? DEFAULT_COMMIT_LOOKBACK_HOURS) * 60 * 60 * 1_000,
     ...(repositoryResult.createCommitSource === undefined

@@ -1,10 +1,19 @@
 export const EVIDENCE_DEFAULTS = {
-  /** Absolute growth below this is noise, not a finding. */
+  /**
+   * Absolute floor for a memory finding. An 8 MiB move on a large instance is the twitch this
+   * exists to ignore; instances under about 400 MiB are still gated by it, because 2% of that is
+   * less than 8 MiB.
+   */
   minGrowthBytes: 8 * 1024 * 1024,
-  /** Relative growth below this is noise, even when the absolute number looks large. */
-  minGrowthRatio: 0.1,
-  /** A single-interval jump at least this large is a step change rather than a trend. */
-  stepChangeRatio: 0.25,
+  /**
+   * Relative floor for a memory finding, as a fraction of the starting stored size.
+   *
+   * A memory anomaly needs this AND `minGrowthBytes`. Either threshold on its own would report
+   * every 8 MiB twitch on a large instance, or every small percentage on a tiny one — the two
+   * cases the pair exists to ignore. The same pair qualifies a one-interval step and a sustained
+   * rise. Which kind it is follows the shape of the series, not a second, harsher percentage.
+   */
+  minGrowthRatio: 0.02,
   /** Drop in TTL coverage (in absolute fraction) that counts as drift. */
   minTtlCoverageDrop: 0.1,
   /** A pattern must account for at least this share of an anomaly to be named. */
@@ -20,7 +29,6 @@ export const EVIDENCE_DEFAULTS = {
 export interface EvidenceOptions {
   readonly minGrowthBytes?: number;
   readonly minGrowthRatio?: number;
-  readonly stepChangeRatio?: number;
   readonly minTtlCoverageDrop?: number;
   readonly minAttributionShare?: number;
   readonly maxAttributionsPerAnomaly?: number;
@@ -39,7 +47,6 @@ export class EvidenceOptionsError extends Error {
 
 const FRACTION_FIELDS = [
   'minGrowthRatio',
-  'stepChangeRatio',
   'minTtlCoverageDrop',
   'minAttributionShare',
   'minSampleRateForAttribution',
@@ -58,7 +65,6 @@ export function resolveEvidenceOptions(options: EvidenceOptions = {}): ResolvedE
   const resolved: ResolvedEvidenceOptions = {
     minGrowthBytes: options.minGrowthBytes ?? EVIDENCE_DEFAULTS.minGrowthBytes,
     minGrowthRatio: options.minGrowthRatio ?? EVIDENCE_DEFAULTS.minGrowthRatio,
-    stepChangeRatio: options.stepChangeRatio ?? EVIDENCE_DEFAULTS.stepChangeRatio,
     minTtlCoverageDrop: options.minTtlCoverageDrop ?? EVIDENCE_DEFAULTS.minTtlCoverageDrop,
     minAttributionShare: options.minAttributionShare ?? EVIDENCE_DEFAULTS.minAttributionShare,
     maxAttributionsPerAnomaly:

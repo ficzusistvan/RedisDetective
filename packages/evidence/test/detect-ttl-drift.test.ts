@@ -28,7 +28,10 @@ describe('detectTtlDrift', () => {
     it('for a pattern whose TTL coverage is unchanged', () => {
       expect(
         detectTtlDrift(
-          withPatterns([patternFixture({ pattern: 'cart:*' })], [patternFixture({ pattern: 'cart:*' })]),
+          withPatterns(
+            [patternFixture({ pattern: 'cart:*' })],
+            [patternFixture({ pattern: 'cart:*' })],
+          ),
           options,
         ),
       ).toEqual([]);
@@ -89,7 +92,9 @@ describe('detectTtlDrift', () => {
         [patternFixture({ pattern: 'cart:*', keysWithTtl: 0, keysWithoutTtl: 40 })],
       );
 
-      expect(detectTtlDrift(snapshots, options).map((event) => event.kind)).toEqual(['ttl-removed']);
+      expect(detectTtlDrift(snapshots, options).map((event) => event.kind)).toEqual([
+        'ttl-removed',
+      ]);
     });
   });
 
@@ -243,7 +248,7 @@ describe('detectTtlDrift', () => {
             pattern: 'config:*',
             keysWithTtl: 0,
             keysWithoutTtl: 100,
-            estimatedKeyCount: 1_020,
+            estimatedKeyCount: 1_010,
           }),
         ],
       );
@@ -289,7 +294,9 @@ describe('detectTtlDrift', () => {
         ],
       );
 
-      expect(detectTtlDrift(snapshots, options).map((event) => event.kind)).toEqual(['ttl-removed']);
+      expect(detectTtlDrift(snapshots, options).map((event) => event.kind)).toEqual([
+        'ttl-removed',
+      ]);
     });
   });
 
@@ -321,7 +328,12 @@ describe('detectTtlDrift', () => {
             keysWithTtl: 60,
             keysWithoutTtl: 0,
           }),
-          patternFixture({ pattern: 'queue:*', dataType: 'list', keysWithTtl: 40, keysWithoutTtl: 0 }),
+          patternFixture({
+            pattern: 'queue:*',
+            dataType: 'list',
+            keysWithTtl: 40,
+            keysWithoutTtl: 0,
+          }),
         ],
         [
           patternFixture({
@@ -330,7 +342,12 @@ describe('detectTtlDrift', () => {
             keysWithTtl: 0,
             keysWithoutTtl: 60,
           }),
-          patternFixture({ pattern: 'queue:*', dataType: 'list', keysWithTtl: 0, keysWithoutTtl: 40 }),
+          patternFixture({
+            pattern: 'queue:*',
+            dataType: 'list',
+            keysWithTtl: 0,
+            keysWithoutTtl: 40,
+          }),
         ],
       );
 

@@ -5,6 +5,7 @@ import {
   parseAlertDurationMs,
 } from '@redis-detective/alerts';
 import type { AlertSeverity } from '@redis-detective/alerts';
+import { EvidenceOptionsError, resolveEvidenceOptions } from '@redis-detective/evidence';
 import {
   GITHUB_APP_ENV_VARS,
   GITHUB_PERSONAL_TOKEN_ENV_VARS,
@@ -18,7 +19,7 @@ import type { CliOutputFormat } from './output-format.js';
 import { MIN_WATCH_INTERVAL_MS } from './watch-defaults.js';
 
 export interface CliOptions {
-  /** `report` runs once; `watch` keeps sampling on an interval. */
+  /** `report` runs once; `watch` keeps sampling on an interval; `push` uploads snapshots. */
   readonly command: CliCommand;
   /** `null` when `--help` or `--version` was requested, or when no URL was supplied. */
   readonly redisUrl: string | null;
@@ -30,6 +31,15 @@ export interface CliOptions {
   /** `SAMPLES` for `MEMORY USAGE` on nested values. `null` leaves the sampler's default. */
   readonly memorySamples: number | null;
   readonly databases: readonly number[] | null;
+  /**
+   * Absolute floor for a memory finding, in bytes. `null` leaves the evidence default (8 MiB).
+   */
+  readonly minGrowthBytes: number | null;
+  /**
+   * Relative floor for a memory finding, as a fraction of starting stored size. `null` leaves the
+   * evidence default (0.02). The same pair qualifies a step and a sustained rise.
+   */
+  readonly minGrowthRatio: number | null;
   readonly redactKeys: boolean;
   /**
    * When true, personal GitHub credentials are `GITHUB_TOKEN` / `GH_TOKEN` only.
@@ -70,6 +80,26 @@ export interface CliOptions {
   readonly alertConfigPath: string | null;
   readonly alertStateFile: string | null;
   readonly alertDryRun: boolean;
+  /** Origin of redis-detective-web. `null` until `--web-url` or `REDIS_DETECTIVE_WEB_URL`. */
+  readonly webUrl: string | null;
+  /** Instance id on the web app. `null` until `--instance` or `REDIS_DETECTIVE_INSTANCE`. */
+  readonly instanceId: string | null;
+  /** Push token for the web app. `null` until `--token` or `REDIS_DETECTIVE_TOKEN`. */
+  readonly token: string | null;
+  /** When true on `watch`, push the snapshot just taken after each sample. */
+  readonly push: boolean;
+  /**
+   * Largest upload body in bytes, including multipart overhead. `null` uses the 4 MiB default.
+   */
+  readonly pushMaxBytes: number | null;
+  /**
+   * Skip snapshots older than this. `null` uses 30 days. `0` uploads every age.
+   */
+  readonly pushMaxAgeMs: number | null;
+  /** Re-upload snapshots the state file already lists as accepted. */
+  readonly pushAll: boolean;
+  /** Override for the push-state file. `null` uses `<snapshots>/.redis-detective-push.json`. */
+  readonly pushStateFile: string | null;
   readonly help: boolean;
   readonly version: boolean;
 }
@@ -90,6 +120,8 @@ interface MutableCliOptions {
   timeoutMs: number | null;
   memorySamples: number | null;
   databases: readonly number[] | null;
+  minGrowthBytes: number | null;
+  minGrowthRatio: number | null;
   redactKeys: boolean;
   skipGh: boolean;
   snapshotDirectory: string | null;
@@ -115,6 +147,14 @@ interface MutableCliOptions {
   alertConfigPath: string | null;
   alertStateFile: string | null;
   alertDryRun: boolean;
+  webUrl: string | null;
+  instanceId: string | null;
+  token: string | null;
+  push: boolean;
+  pushMaxBytes: number | null;
+  pushMaxAgeMs: number | null;
+  pushAll: boolean;
+  pushStateFile: string | null;
   help: boolean;
   version: boolean;
 }
@@ -170,6 +210,34 @@ function parseDurationMs(flag: string, raw: string): number {
     );
   }
   return Number(digits) * unitToMs(match?.[2] ?? 's');
+}
+
+/**
+ * Same shapes as a watch interval, plus days, because retention is measured in days.
+ * A bare number is seconds, matching `--interval`. `0` keeps every age.
+ */
+function parsePushMaxAgeMs(flag: string, raw: string): number {
+  const match = /^(\d+)(s|m|h|d)?$/.exec(raw.trim());
+  const digits = match?.[1];
+  if (digits === undefined) {
+    throw new CliUsageError(
+      `${flag} expects a duration such as 30d, 12h or 45m, or 0 to upload every age, received "${raw}".`,
+    );
+  }
+  return Number(digits) * pushAgeUnitMs(match?.[2] ?? 's');
+}
+
+function pushAgeUnitMs(unit: string): number {
+  switch (unit) {
+    case 'd':
+      return 24 * 60 * 60 * 1_000;
+    case 'h':
+      return 60 * 60 * 1_000;
+    case 'm':
+      return 60 * 1_000;
+    default:
+      return 1_000;
+  }
 }
 
 function parseWatchInterval(flag: string, raw: string): number {
@@ -228,6 +296,8 @@ export function parseCliArgs(
     timeoutMs: null,
     memorySamples: null,
     databases: null,
+    minGrowthBytes: null,
+    minGrowthRatio: null,
     redactKeys: false,
     skipGh: false,
     snapshotDirectory: null,
@@ -253,6 +323,14 @@ export function parseCliArgs(
     alertConfigPath: null,
     alertStateFile: null,
     alertDryRun: false,
+    webUrl: null,
+    instanceId: null,
+    token: null,
+    push: false,
+    pushMaxBytes: null,
+    pushMaxAgeMs: null,
+    pushAll: false,
+    pushStateFile: null,
     help: false,
     version: false,
   };
@@ -266,7 +344,9 @@ export function parseCliArgs(
       return [inlineValue, index];
     }
     const next = flags[index + 1];
-    if (next === undefined || next.startsWith('-')) {
+    // A negative number is a value (`--min-growth-bytes -1`), not another flag. Anything else
+    // that starts with `-` is a missing value, so the error names the flag rather than the token.
+    if (next === undefined || (next.startsWith('-') && !/^-[\d.]/.test(next))) {
       throw new CliUsageError(`${flag} expects a value.`);
     }
     return [next, index + 1];
@@ -432,6 +512,65 @@ export function parseCliArgs(
         options.skipGh = true;
         break;
 
+      case '--push':
+        options.push = true;
+        break;
+
+      case '--push-all':
+        options.pushAll = true;
+        break;
+
+      case '--push-max-bytes': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushMaxBytes = parsePositiveInteger(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--push-max-age': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushMaxAgeMs = parsePushMaxAgeMs(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--push-state-file': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.pushStateFile = requireNonEmpty(flag, value);
+        index = nextIndex;
+        break;
+      }
+
+      case '--web-url': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--web-url expects the redis-detective-web origin.');
+        }
+        options.webUrl = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--instance': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--instance expects an instance id.');
+        }
+        options.instanceId = value;
+        index = nextIndex;
+        break;
+      }
+
+      case '--token': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        if (value === '') {
+          throw new CliUsageError('--token expects a push token.');
+        }
+        options.token = value;
+        index = nextIndex;
+        break;
+      }
+
       case '--snapshots': {
         const [value, nextIndex] = takeValue(flag, inlineValue, index);
         if (value === '') {
@@ -495,6 +634,20 @@ export function parseCliArgs(
         break;
       }
 
+      case '--min-growth-bytes': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.minGrowthBytes = parseEvidenceThreshold(flag, value, 'minGrowthBytes');
+        index = nextIndex;
+        break;
+      }
+
+      case '--min-growth-ratio': {
+        const [value, nextIndex] = takeValue(flag, inlineValue, index);
+        options.minGrowthRatio = parseEvidenceThreshold(flag, value, 'minGrowthRatio');
+        index = nextIndex;
+        break;
+      }
+
       case '--databases': {
         const [value, nextIndex] = takeValue(flag, inlineValue, index);
         options.databases = parseDatabaseList(value);
@@ -516,6 +669,16 @@ export function parseCliArgs(
 
   if (options.redisUrl === null) {
     options.redisUrl = env['REDIS_URL'] ?? null;
+  }
+
+  if (options.webUrl === null) {
+    options.webUrl = firstEnv(env, 'REDIS_DETECTIVE_WEB_URL');
+  }
+  if (options.instanceId === null) {
+    options.instanceId = firstEnv(env, 'REDIS_DETECTIVE_INSTANCE');
+  }
+  if (options.token === null) {
+    options.token = firstEnv(env, 'REDIS_DETECTIVE_TOKEN');
   }
 
   applyAlertEnvFallbacks(options, env);
@@ -557,6 +720,23 @@ export function parseCliArgs(
 function requireNonEmpty(flag: string, value: string): string {
   if (value === '') {
     throw new CliUsageError(`${flag} expects a value.`);
+  }
+  return value;
+}
+
+function parseEvidenceThreshold(
+  flag: string,
+  raw: string,
+  field: 'minGrowthBytes' | 'minGrowthRatio',
+): number {
+  const value = Number(raw);
+  try {
+    resolveEvidenceOptions({ [field]: value });
+  } catch (error) {
+    if (error instanceof EvidenceOptionsError) {
+      throw new CliUsageError(`${flag}: ${error.message}`);
+    }
+    throw error;
   }
   return value;
 }

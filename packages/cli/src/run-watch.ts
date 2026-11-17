@@ -1,9 +1,12 @@
+import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { EvidenceOptions } from '@redis-detective/evidence';
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
 import { CLI_NAME } from './cli-usage.js';
 import type { DiagnosisReport } from './diagnosis-report.js';
 import { formatDuration } from './format-bytes.js';
 import { formatWatchTick } from './format-watch-tick.js';
+import type { PushResult } from './push-snapshots.js';
 import { runDiagnosis } from './run-diagnosis.js';
 import type { SnapshotStore } from './snapshot-store.js';
 
@@ -40,6 +43,8 @@ export interface RunWatchRequest {
   readonly memorySamples: number | null;
   readonly databases: readonly number[] | null;
   readonly redactKeys: boolean;
+  /** Memory-finding thresholds forwarded to each tick's diagnosis. */
+  readonly evidenceOptions?: EvidenceOptions;
   /**
    * `owner/repo` the user asked about, for the notice that says commits are not looked up here.
    * Never used to query GitHub — see the class comment.
@@ -58,6 +63,12 @@ export interface RunWatchRequest {
    * skip the snapshot that was just written. Must not throw.
    */
   readonly afterTick?: (report: DiagnosisReport) => Promise<void>;
+  /**
+   * When set, called with the snapshot just saved so a long watch can upload that sample to
+   * redis-detective-web. A failed push never aborts the session; the next interval still samples.
+   * Catching a throw here is what keeps a transport bug from ending the loop.
+   */
+  readonly pushSnapshots?: (sampled: RedisSnapshot) => Promise<PushResult>;
   /** Extra lines after the standard "Watching …" banner (alert channel summary). */
   readonly extraOpeningLines?: readonly string[];
 }
@@ -78,6 +89,9 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     `Watching ${request.target} every ${formatDuration(request.intervalMs / 1_000)}, saving to ${request.store.describe}.`,
     'One line per sample, not the full report. Ctrl-C stops after the sample in flight.',
   ];
+  if (request.pushSnapshots !== undefined) {
+    lines.push('After each sample, that snapshot is pushed to redis-detective-web.');
+  }
   if (request.repository !== null) {
     lines.push(
       `Candidate commits are not looked up while watching, so a long session makes no GitHub requests. Run ${diagnosisCommand(request)} afterwards for those.`,
@@ -87,6 +101,16 @@ function openingLines(request: RunWatchRequest): readonly string[] {
     lines.push(...request.extraOpeningLines);
   }
   return lines;
+}
+
+function pushLine(result: PushResult): string {
+  if (result.ok) {
+    return result.message ?? 'Pushed snapshots to the web app.';
+  }
+  if (result.status === 409) {
+    return `Push skipped: ${result.message}`;
+  }
+  return `Push failed: ${result.message}`;
 }
 
 function closingLines(request: RunWatchRequest, summary: WatchSummary): readonly string[] {
@@ -140,6 +164,9 @@ export async function runWatch(
       memorySamples: request.memorySamples,
       databases: request.databases,
       redactKeys: request.redactKeys,
+      ...(request.evidenceOptions === undefined
+        ? {}
+        : { evidenceOptions: request.evidenceOptions }),
       repository: null,
     });
     snapshotsTaken += 1;
@@ -166,6 +193,16 @@ export async function runWatch(
         await request.afterTick(report);
       } catch {
         writeLine('alert tick failed; watch continues.');
+      }
+    }
+
+    if (request.pushSnapshots !== undefined) {
+      try {
+        writeLine(pushLine(await request.pushSnapshots(sampled)));
+      } catch (error: unknown) {
+        const detail =
+          error instanceof Error && error.message !== '' ? error.message : 'unknown error';
+        writeLine(`Push failed: ${detail}`);
       }
     }
 

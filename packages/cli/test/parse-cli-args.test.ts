@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CliUsageError, parseCliArgs } from '@redis-detective/cli';
+import { CliUsageError, HELP_TEXT, parseCliArgs } from '@redis-detective/cli';
 
 describe('parseCliArgs --skip-gh', () => {
   it('defaults to consulting gh, and turns that off from the flag or the env', () => {
@@ -16,6 +16,74 @@ describe('parseCliArgs --redact-keys', () => {
   it('defaults to off and is enabled by the flag', () => {
     expect(parseCliArgs([], {}).redactKeys).toBe(false);
     expect(parseCliArgs(['--redact-keys'], {}).redactKeys).toBe(true);
+  });
+});
+
+describe('parseCliArgs push', () => {
+  it('reads the push subcommand and web credentials from flags or env', () => {
+    const fromFlags = parseCliArgs([
+      'push',
+      '--snapshots',
+      './snaps',
+      '--web-url',
+      'https://app.example.com',
+      '--instance',
+      'inst-1',
+      '--token',
+      'rdp_secret',
+    ]);
+    expect(fromFlags.command).toBe('push');
+    expect(fromFlags.snapshotDirectory).toBe('./snaps');
+    expect(fromFlags.webUrl).toBe('https://app.example.com');
+    expect(fromFlags.instanceId).toBe('inst-1');
+    expect(fromFlags.token).toBe('rdp_secret');
+
+    const fromEnv = parseCliArgs(['watch', '--push'], {
+      REDIS_DETECTIVE_WEB_URL: 'https://app.example.com',
+      REDIS_DETECTIVE_INSTANCE: 'inst-1',
+      REDIS_DETECTIVE_TOKEN: 'rdp_secret',
+    });
+    expect(fromEnv.command).toBe('watch');
+    expect(fromEnv.push).toBe(true);
+    expect(fromEnv.webUrl).toBe('https://app.example.com');
+    expect(fromEnv.instanceId).toBe('inst-1');
+    expect(fromEnv.token).toBe('rdp_secret');
+    expect(fromFlags.pushAll).toBe(false);
+    expect(fromFlags.pushMaxBytes).toBeNull();
+    expect(fromFlags.pushMaxAgeMs).toBeNull();
+    expect(fromFlags.pushStateFile).toBeNull();
+  });
+
+  it('reads batch, age, and re-upload flags', () => {
+    const options = parseCliArgs([
+      'push',
+      '--snapshots',
+      './snaps',
+      '--push-all',
+      '--push-max-bytes',
+      '1000000',
+      '--push-max-age',
+      '30d',
+      '--push-state-file',
+      './snaps/state.json',
+    ]);
+
+    expect(options.pushAll).toBe(true);
+    expect(options.pushMaxBytes).toBe(1_000_000);
+    expect(options.pushMaxAgeMs).toBe(30 * 24 * 60 * 60 * 1_000);
+    expect(options.pushStateFile).toBe('./snaps/state.json');
+    expect(parseCliArgs(['--push-max-age', '0']).pushMaxAgeMs).toBe(0);
+    expect(parseCliArgs(['--push-max-age', '12h']).pushMaxAgeMs).toBe(12 * 60 * 60 * 1_000);
+    expect(() => parseCliArgs(['--push-max-bytes', '0'])).toThrow(CliUsageError);
+    expect(() => parseCliArgs(['--push-max-age', '30 days'])).toThrow(CliUsageError);
+  });
+
+  it('documents batched push in the help text', () => {
+    expect(HELP_TEXT).toContain('--push-max-bytes');
+    expect(HELP_TEXT).toContain('--push-max-age');
+    expect(HELP_TEXT).toContain('--push-all');
+    expect(HELP_TEXT).toContain('--push-state-file');
+    expect(HELP_TEXT).toContain('4 MiB');
   });
 });
 
@@ -98,6 +166,19 @@ describe('parseCliArgs', () => {
     expect(
       parseCliArgs(['--url', 'redis://flag:6379'], { REDIS_URL: 'redis://env:6379' }).redisUrl,
     ).toBe('redis://flag:6379');
+  });
+
+  it('parses memory-growth thresholds and rejects values evidence options reject', () => {
+    expect(parseCliArgs([]).minGrowthBytes).toBeNull();
+    expect(parseCliArgs([]).minGrowthRatio).toBeNull();
+
+    const options = parseCliArgs(['--min-growth-bytes', '1048576', '--min-growth-ratio=0.05']);
+    expect(options.minGrowthBytes).toBe(1_048_576);
+    expect(options.minGrowthRatio).toBe(0.05);
+
+    expect(() => parseCliArgs(['--min-growth-ratio', '1.5'])).toThrow(/minGrowthRatio/);
+    expect(() => parseCliArgs(['--min-growth-bytes', '-1'])).toThrow(/minGrowthBytes/);
+    expect(() => parseCliArgs(['--min-growth-bytes', 'nope'])).toThrow(CliUsageError);
   });
 
   it('parses the sampling flags', () => {

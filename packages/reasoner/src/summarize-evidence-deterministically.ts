@@ -61,14 +61,45 @@ function weakestStrength(values: readonly EvidenceStrength[]): EvidenceStrength 
 
 function formatBytes(bytes: number): string {
   const sign = bytes < 0 ? '-' : bytes > 0 ? '+' : '';
+  return `${sign}${formatBinaryMagnitude(Math.abs(bytes))}`;
+}
+
+function formatBinaryMagnitude(bytes: number): string {
   const abs = Math.abs(bytes);
+  const gib = 1024 * 1_048_576;
+  if (abs >= gib) {
+    return `${trimOneDecimal(abs / gib)} GiB`;
+  }
   if (abs >= 1_048_576) {
-    return `${sign}${(abs / 1_048_576).toFixed(1)} MiB`;
+    return `${trimOneDecimal(abs / 1_048_576)} MiB`;
   }
   if (abs >= 1024) {
-    return `${sign}${(abs / 1024).toFixed(1)} KiB`;
+    return `${trimOneDecimal(abs / 1024)} KiB`;
   }
-  return `${sign}${String(abs)} bytes`;
+  const whole = String(Math.round(abs));
+  return abs === 1 ? `${whole} byte` : `${whole} bytes`;
+}
+
+function trimOneDecimal(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+/** `2026-11-14T03:30:00.000Z` becomes `2026-11-14 03:30 UTC`. */
+function formatUtcInstant(iso: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?Z$/.exec(iso);
+  const date = match?.[1];
+  const hours = match?.[2];
+  const minutes = match?.[3];
+  const seconds = match?.[4];
+  if (date === undefined || hours === undefined || minutes === undefined) {
+    return iso;
+  }
+  const clock =
+    seconds === undefined || seconds === '00'
+      ? `${hours}:${minutes}`
+      : `${hours}:${minutes}:${seconds}`;
+  return `${date} ${clock} UTC`;
 }
 
 function percent(value: number): string {
@@ -183,8 +214,8 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
       kind: 'anomaly',
       statement:
         anomaly.deltaBytes === null
-          ? `${anomaly.kind} on ${anomaly.metric} between ${anomaly.window.from} and ${anomaly.window.to}.`
-          : `${anomaly.kind} of ${formatBytes(anomaly.deltaBytes)} on ${anomaly.metric} between ${anomaly.window.from} and ${anomaly.window.to}.`,
+          ? `${anomaly.kind} on ${anomaly.metric} between ${formatUtcInstant(anomaly.window.from)} and ${formatUtcInstant(anomaly.window.to)}.`
+          : `${anomaly.kind} of ${formatBytes(anomaly.deltaBytes)} on ${anomaly.metric} between ${formatUtcInstant(anomaly.window.from)} and ${formatUtcInstant(anomaly.window.to)}.`,
     });
   }
   for (const event of driftEvents) {
@@ -251,6 +282,13 @@ function headlineWithoutCause(graph: EvidenceGraph): string {
     return 'Not enough snapshots to explain the growth.';
   }
   if (kinds.has('no-growth-detected')) {
+    const gap = graph.gaps.find((entry) => entry.kind === 'no-growth-detected');
+    const sentence = openingSentence(gap?.detail ?? '');
+    // The reserved sentence is only for a window whose stored size did not change. A change that
+    // missed the anomaly rule already states itself as the first sentence of the gap.
+    if (sentence.startsWith('Memory grew ') || sentence.startsWith('Memory fell ')) {
+      return sentence;
+    }
     return 'No memory growth was found in this window.';
   }
   if (kinds.has('memory-not-comparable')) {
@@ -262,12 +300,25 @@ function headlineWithoutCause(graph: EvidenceGraph): string {
   return 'The evidence does not support naming a cause.';
 }
 
+function openingSentence(detail: string): string {
+  const trimmed = detail.trim();
+  const breakAt = trimmed.indexOf('. ');
+  if (breakAt === -1) {
+    return trimmed.endsWith('.') ? trimmed : `${trimmed}.`;
+  }
+  return trimmed.slice(0, breakAt + 1);
+}
+
 function summaryWithoutCause(graph: EvidenceGraph, input: ReasonerInput): string {
   const firstGap = graph.gaps[0];
+  const windowText = `${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}`;
   if (firstGap !== undefined) {
-    return `${firstGap.detail} Window ${graph.window.from} -> ${graph.window.to}.`;
+    if (firstGap.detail.includes(windowText)) {
+      return firstGap.detail;
+    }
+    return `${firstGap.detail} Window ${windowText}.`;
   }
-  return `No anomaly, attribution or TTL drift was established from the ${String(graph.snapshotIds.length)} snapshot(s) supplied at ${input.generatedAt}.`;
+  return `No anomaly, attribution or TTL drift was established from the ${String(graph.snapshotIds.length)} snapshot(s) supplied at ${formatUtcInstant(input.generatedAt)}.`;
 }
 
 function causeHeadline(
@@ -316,7 +367,7 @@ function causeSummary(
   commits: readonly GitCommitCandidate[],
 ): string {
   const parts = [
-    `Between ${graph.window.from} and ${graph.window.to}, used memory moved by ${formatBytes(deltaBytes)}.`,
+    `Between ${formatUtcInstant(graph.window.from)} and ${formatUtcInstant(graph.window.to)}, used memory moved by ${formatBytes(deltaBytes)}.`,
     `${attribution.pattern} accounts for ${percent(attribution.shareOfAnomalyGrowth)} of that growth (${MECHANISM_SUMMARY[attribution.mechanism]}).`,
   ];
   if (commits.length > 0) {

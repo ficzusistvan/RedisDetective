@@ -7,16 +7,13 @@ import type {
   ScanResponse,
 } from '@redis-detective/sampler';
 
+import { RedisConnectionError } from './redis-connection-error.js';
+
+export { RedisConnectionError } from './redis-connection-error.js';
+
 export interface RedisConnection {
   readonly client: RedisCommandClient;
   close(): Promise<void>;
-}
-
-export class RedisConnectionError extends Error {
-  constructor(message: string, options?: { readonly cause?: unknown }) {
-    super(message, options);
-    this.name = 'RedisConnectionError';
-  }
 }
 
 type NodeRedisClient = ReturnType<typeof createClient>;

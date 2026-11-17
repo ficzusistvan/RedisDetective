@@ -10,6 +10,10 @@ import type {
   SamplingMetadata,
 } from '@redis-detective/core-types';
 
+import { StoredSnapshotError } from './stored-snapshot-error.js';
+
+export { StoredSnapshotError } from './stored-snapshot-error.js';
+
 /**
  * Bumped whenever the stored shape changes incompatibly.
  *
@@ -18,13 +22,6 @@ import type {
  * confident diagnosis from partial data.
  */
 export const SNAPSHOT_FILE_SCHEMA_VERSION = 1;
-
-export class StoredSnapshotError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'StoredSnapshotError';
-  }
-}
 
 const DEPLOYMENT_MODES: readonly RedisDeploymentMode[] = [
   'standalone',

@@ -172,6 +172,7 @@ pnpm health-check -- --url redis://localhost:6379
 ```
 
 The public npm package is `redis-detective`, staged by `pnpm pack:cli` into `packages/cli/publish`.
+The tarball includes the CLI (`bin.js`) and a programmatic API (`index.js` + `index.d.ts`).
 Internal `@redis-detective/*` packages stay private and are bundled into that tarball. The GitHub
 repo may stay private; provenance is omitted in that case. Do not `npm publish` the workspace CLI
 package.
@@ -205,8 +206,9 @@ The README is what npm users see. Keep it operator-facing; contributor and relea
 
 ## Current state
 
-Health check, sampler, evidence, CLI diagnosis, GitHub candidate lookup, and the reasoner
-(deterministic paragraph, optional LLM wording behind the validator) are implemented. The `watch`
+Health check, sampler, evidence, CLI diagnosis, GitHub candidate lookup, the reasoner
+(deterministic paragraph, optional LLM wording behind the validator), and a programmatic library
+API on the published `redis-detective` package are implemented. The `watch`
 subcommand runs the diagnosis path on an interval into a local snapshot directory, with no commit
 lookup and no model call per tick. When thresholds and a channel are configured it reuses the CI
 gate comparison and notifies Slack, a generic webhook, or PagerDuty (`packages/alerts`) without

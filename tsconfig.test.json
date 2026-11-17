@@ -14,7 +14,8 @@
       "@redis-detective/github-integration": ["./packages/github-integration/src/index.ts"],
       "@redis-detective/reasoner": ["./packages/reasoner/src/index.ts"],
       "@redis-detective/alerts": ["./packages/alerts/src/index.ts"],
-      "@redis-detective/cli": ["./packages/cli/src/index.ts"]
+      "@redis-detective/cli": ["./packages/cli/src/index.ts"],
+      "redis-detective": ["./packages/cli/src/api.ts"]
     }
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "vitest.shared.ts"]

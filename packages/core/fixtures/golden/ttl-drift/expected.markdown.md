@@ -1,17 +1,21 @@
 # Redis Memory Diagnosis
 
 - **Generated:** 2026-08-25T14:00:00.000Z
-- **Store:** /Users/istvanficzus/PrivateProjects/RedisDetective/packages/core/fixtures/golden/ttl-drift
+- **Store:** <fixtures>/ttl-drift/snapshots
 - **Target:** stored snapshots only (no live connection)
 - **Window:** 2026-08-25T10:00:00.000Z → 2026-08-25T11:00:00.000Z (2 snapshots)
 
 ## Why
 
-The evidence does not support naming a cause.
+session:* TTL coverage moved from 100% to 20%.
 
-No anomaly, attribution or TTL drift was established from the 2 snapshot(s) supplied at 2026-08-25 14:00 UTC.
+session:* TTL coverage moved from 100% to 20% (ttl-coverage-declining). Across the window 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.
 
-**Named cause:** none (unclear evidence)
+**Named cause:** none (moderate evidence)
+
+### What to do
+
+- Some writers still set an expiry and others no longer do. Look for a second write path added to this pattern.
 
 ## TTL drift
 

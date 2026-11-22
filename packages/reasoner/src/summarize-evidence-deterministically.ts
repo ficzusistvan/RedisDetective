@@ -168,6 +168,11 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
   const unknowns = graph.gaps.map((gap) => gap.detail);
 
   if (attribution === null) {
+    // TTL drift can stand alone: coverage collapse without a memory anomaly is still a finding.
+    if (graph.ttlDrift.length > 0) {
+      return explanationFromTtlDriftOnly(input);
+    }
+
     const headline = headlineWithoutCause(graph);
     const summary = summaryWithoutCause(graph, input);
     for (const gap of graph.gaps) {
@@ -276,6 +281,88 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
   };
 }
 
+/**
+ * TTL drift without a memory attribution: report the coverage change, never claim "no TTL drift".
+ *
+ * `likelyCause` stays null — drift alone is not a named cause of memory growth — but the headline,
+ * summary, citations and actions all restate the established events.
+ */
+function explanationFromTtlDriftOnly(input: ReasonerInput): Explanation {
+  const { graph } = input;
+  const ranked = [...graph.ttlDrift].sort(
+    (left, right) =>
+      STRENGTH_RANK[right.evidenceStrength] - STRENGTH_RANK[left.evidenceStrength] ||
+      left.pattern.localeCompare(right.pattern) ||
+      left.eventId.localeCompare(right.eventId),
+  );
+  const primary = ranked[0];
+  if (primary === undefined) {
+    // Defensive: caller guards on `ttlDrift.length > 0`.
+    return {
+      explanationId: explanationId(graph.graphId),
+      generatedAt: input.generatedAt,
+      graphId: graph.graphId,
+      headline: 'The evidence does not support naming a cause.',
+      summary: summaryWithoutCause(graph, input),
+      likelyCause: null,
+      hintedCandidateShas: [],
+      supportingEvidence: [],
+      recommendedActions: [],
+      evidenceStrength: 'unclear',
+      unknowns: graph.gaps.map((gap) => gap.detail),
+      model: null,
+    };
+  }
+
+  const citations: ExplanationCitation[] = ranked.map((event) => ({
+    evidenceId: event.eventId,
+    kind: 'ttl-drift' as const,
+    statement: `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
+  }));
+  for (const gap of graph.gaps) {
+    citations.push({
+      evidenceId: gapEvidenceId(gap.kind),
+      kind: 'gap',
+      statement: gap.detail,
+    });
+  }
+
+  const actions = unique([
+    ...ranked.map((event) => TTL_ACTION[event.kind]),
+    ...graph.gaps
+      .map((gap) => gap.remedy)
+      .filter((remedy): remedy is string => remedy !== null),
+  ]);
+
+  const windowText = `${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}`;
+  const driftSentences = ranked.map(
+    (event) =>
+      `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
+  );
+  const summary = [
+    ...driftSentences,
+    `Across the window ${windowText}.`,
+    graph.gaps.length > 0 ? 'See limitations for what this sample could not establish.' : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(' ');
+
+  return {
+    explanationId: explanationId(graph.graphId),
+    generatedAt: input.generatedAt,
+    graphId: graph.graphId,
+    headline: `${primary.pattern} TTL coverage moved from ${percent(primary.ttlCoverageBefore)} to ${percent(primary.ttlCoverageAfter)}.`,
+    summary,
+    likelyCause: null,
+    hintedCandidateShas: [],
+    supportingEvidence: citations,
+    recommendedActions: actions,
+    evidenceStrength: weakestStrength(ranked.map((event) => event.evidenceStrength)),
+    unknowns: graph.gaps.map((gap) => gap.detail),
+    model: null,
+  };
+}
+
 function headlineWithoutCause(graph: EvidenceGraph): string {
   const kinds = new Set(graph.gaps.map((gap) => gap.kind));
   if (kinds.has('insufficient-snapshots')) {
@@ -290,6 +377,14 @@ function headlineWithoutCause(graph: EvidenceGraph): string {
       return sentence;
     }
     return 'No memory growth was found in this window.';
+  }
+  if (kinds.has('snapshot-gap')) {
+    const gap = graph.gaps.find((entry) => entry.kind === 'snapshot-gap');
+    const sentence = openingSentence(gap?.detail ?? '');
+    if (sentence.startsWith('Memory grew ') || sentence.startsWith('Memory fell ')) {
+      return sentence;
+    }
+    return 'A gap between snapshots prevents attributing the memory change.';
   }
   if (kinds.has('memory-not-comparable')) {
     return 'Memory could not be compared as stored size for every snapshot.';
@@ -310,6 +405,14 @@ function openingSentence(detail: string): string {
 }
 
 function summaryWithoutCause(graph: EvidenceGraph, input: ReasonerInput): string {
+  // Never claim TTL drift was absent when the graph already records it.
+  if (graph.ttlDrift.length > 0) {
+    const event = graph.ttlDrift[0];
+    if (event !== undefined) {
+      return `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)}. Window ${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}.`;
+    }
+  }
+
   const firstGap = graph.gaps[0];
   const windowText = `${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}`;
   if (firstGap !== undefined) {
@@ -318,7 +421,7 @@ function summaryWithoutCause(graph: EvidenceGraph, input: ReasonerInput): string
     }
     return `${firstGap.detail} Window ${windowText}.`;
   }
-  return `No anomaly, attribution or TTL drift was established from the ${String(graph.snapshotIds.length)} snapshot(s) supplied at ${formatUtcInstant(input.generatedAt)}.`;
+  return `No anomaly or attribution was established from the ${String(graph.snapshotIds.length)} snapshot(s) supplied at ${formatUtcInstant(input.generatedAt)}.`;
 }
 
 function causeHeadline(

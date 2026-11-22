@@ -215,11 +215,16 @@ describe('buildEvidenceGraph', () => {
       const graph = build(snapshots);
 
       expect(graph.gaps.map((gap) => gap.kind)).toContain('snapshot-gap');
+      expect(graph.gaps.map((gap) => gap.kind)).not.toContain('no-growth-detected');
       // The interval was not analysed, so no anomaly may be claimed from it.
       expect(graph.anomalies).toEqual([]);
-      expect(graph.gaps.find((gap) => gap.kind === 'snapshot-gap')?.detail).toContain(
-        String(EVIDENCE_DEFAULTS.maxSnapshotGapMs),
+      const snapshotGap = graph.gaps.find((gap) => gap.kind === 'snapshot-gap');
+      expect(snapshotGap?.detail).toContain(String(EVIDENCE_DEFAULTS.maxSnapshotGapMs));
+      // Growth cleared both thresholds; the gap is why it was not attributed — not "below thresholds".
+      expect(snapshotGap?.detail).toMatch(
+        /Memory grew .+ \(\+200%\), but a 9 h gap between snapshots prevents attributing it/,
       );
+      expect(snapshotGap?.detail).not.toContain('below anomaly thresholds');
     });
 
     it('records pattern-not-comparable for a pattern missing from a snapshot', () => {

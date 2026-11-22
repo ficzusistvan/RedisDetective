@@ -138,9 +138,25 @@ function collectProse(explanation: Explanation): string {
   return parts.join('\n');
 }
 
+function weakestStrength(values: readonly EvidenceStrength[]): EvidenceStrength {
+  if (values.length === 0) {
+    return 'unclear';
+  }
+  return values.reduce(
+    (weakest, next) => (STRENGTH_RANK[next] < STRENGTH_RANK[weakest] ? next : weakest),
+    values[0] ?? 'unclear',
+  );
+}
+
 function maxSupportedStrength(explanation: Explanation, input: ReasonerInput): EvidenceStrength {
   if (explanation.likelyCause === null) {
-    return 'unclear';
+    // TTL drift can stand alone without naming a memory cause; cited drift events cap strength.
+    const citedDrift = input.graph.ttlDrift.filter((event) =>
+      explanation.supportingEvidence.some(
+        (citation) => citation.kind === 'ttl-drift' && citation.evidenceId === event.eventId,
+      ),
+    );
+    return weakestStrength(citedDrift.map((event) => event.evidenceStrength));
   }
 
   const matching = input.graph.attributions.filter(
@@ -155,18 +171,11 @@ function maxSupportedStrength(explanation: Explanation, input: ReasonerInput): E
     ),
   );
 
-  const strengths: EvidenceStrength[] = [
+  return weakestStrength([
     ...matching.map((attribution) => attribution.evidenceStrength),
     ...drift.map((event) => event.evidenceStrength),
     ...citedAnomalies.map((anomaly) => anomaly.evidenceStrength),
-  ];
-  if (strengths.length === 0) {
-    return 'unclear';
-  }
-  return strengths.reduce(
-    (weakest, next) => (STRENGTH_RANK[next] < STRENGTH_RANK[weakest] ? next : weakest),
-    strengths[0] ?? 'unclear',
-  );
+  ]);
 }
 
 export function isEvidenceKind(value: unknown): value is EvidenceKind {

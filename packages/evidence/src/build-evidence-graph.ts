@@ -239,17 +239,46 @@ function crossReferenceTtlDrift(
 }
 
 /**
- * What to say when nothing rose far enough to be an anomaly.
- *
- * A flat window may say that no growth was found. A window whose stored size did change says the
- * change, in MiB/GiB and clock time, including when that change is still under the anomaly rule.
- * Patterns that account for at least `minAttributionShare` of a sub-threshold rise are named as
- * contributors. They are not attributions and they are not a cause.
+ * Largest wall-clock gap between consecutive snapshots, or `null` when there are fewer than two.
  */
-function noGrowthDetail(
-  snapshots: readonly RedisSnapshot[],
-  options: ResolvedEvidenceOptions,
-): string {
+function largestSnapshotGapMs(snapshots: readonly RedisSnapshot[]): number | null {
+  let largest: number | null = null;
+  for (let index = 0; index + 1 < snapshots.length; index += 1) {
+    const before = snapshots[index];
+    const after = snapshots[index + 1];
+    if (before === undefined || after === undefined) {
+      continue;
+    }
+    const gap = Date.parse(after.capturedAt) - Date.parse(before.capturedAt);
+    if (largest === null || gap > largest) {
+      largest = gap;
+    }
+  }
+  return largest;
+}
+
+/**
+ * Human duration for a gap sentence. Whole hours stay whole (`9 h`); otherwise one decimal.
+ */
+function formatGapDuration(ms: number): string {
+  const hours = ms / (60 * 60 * 1000);
+  const rounded = Math.round(hours * 10) / 10;
+  return Number.isInteger(rounded) ? `${String(rounded)} h` : `${rounded.toFixed(1)} h`;
+}
+
+interface StoredSizeSpan {
+  readonly before: number;
+  readonly after: number;
+  readonly delta: number;
+  readonly ratio: number;
+  readonly first: RedisSnapshot;
+  readonly last: RedisSnapshot;
+  readonly from: string;
+  readonly to: string;
+  readonly span: string;
+}
+
+function storedSizeSpan(snapshots: readonly RedisSnapshot[]): StoredSizeSpan | null {
   const metric = selectGrowthMetric(snapshots);
   const comparable = snapshots.filter(
     (snapshot) => comparableStoredBytes(snapshot, metric) !== null,
@@ -259,21 +288,74 @@ function noGrowthDetail(
   const from = formatUtcInstant(snapshots[0]?.capturedAt ?? '');
   const to = formatUtcInstant(snapshots[snapshots.length - 1]?.capturedAt ?? '');
   const span = `Across ${String(snapshots.length)} snapshots from ${from} to ${to}.`;
-
   const before = first === undefined ? null : comparableStoredBytes(first, metric);
   const after = last === undefined ? null : comparableStoredBytes(last, metric);
   if (
     first === undefined ||
     last === undefined ||
     before === null ||
-    after === null ||
-    before === after
+    after === null
   ) {
+    return null;
+  }
+  return {
+    before,
+    after,
+    delta: after - before,
+    ratio: relativeChange(before, after),
+    first,
+    last,
+    from,
+    to,
+    span,
+  };
+}
+
+/**
+ * When stored size cleared both anomaly bars but every comparable interval was a snapshot gap,
+ * say that — never "below anomaly thresholds". Returns null when this case does not apply.
+ */
+function gapBlockedGrowthDetail(
+  snapshots: readonly RedisSnapshot[],
+  options: ResolvedEvidenceOptions,
+): string | null {
+  const span = storedSizeSpan(snapshots);
+  if (span === null || span.delta <= 0) {
+    return null;
+  }
+  if (span.delta < options.minGrowthBytes || span.ratio < options.minGrowthRatio) {
+    return null;
+  }
+  const largestGap = largestSnapshotGapMs(snapshots);
+  if (largestGap === null || largestGap <= options.maxSnapshotGapMs) {
+    return null;
+  }
+  return `Memory grew ${formatBinaryMagnitude(span.delta)} (+${formatRatioPercent(span.ratio)}), but a ${formatGapDuration(largestGap)} gap between snapshots prevents attributing it; capture snapshots at a shorter interval.`;
+}
+
+/**
+ * What to say when nothing rose far enough to be an anomaly.
+ *
+ * A flat window may say that no growth was found. A window whose stored size did change says the
+ * change, in MiB/GiB and clock time. "Below anomaly thresholds" is reserved for growth that is
+ * genuinely under both bars. Patterns that account for at least `minAttributionShare` of a
+ * sub-threshold rise are named as contributors. They are not attributions and they are not a cause.
+ *
+ * Growth that clears both bars but was blocked by a snapshot gap is handled separately via
+ * `gapBlockedGrowthDetail` and folded into the `snapshot-gap` entry — not this gap kind.
+ */
+function noGrowthDetail(
+  snapshots: readonly RedisSnapshot[],
+  options: ResolvedEvidenceOptions,
+): string {
+  const spanInfo = storedSizeSpan(snapshots);
+  if (spanInfo === null || spanInfo.before === spanInfo.after) {
+    const from = formatUtcInstant(snapshots[0]?.capturedAt ?? '');
+    const to = formatUtcInstant(snapshots[snapshots.length - 1]?.capturedAt ?? '');
     return `No memory growth was found across ${String(snapshots.length)} snapshots from ${from} to ${to}.`;
   }
 
-  const delta = after - before;
-  const ratio = relativeChange(before, after);
+  const { delta, ratio, first, last, span } = spanInfo;
   if (delta < 0) {
     return `Memory fell ${formatBinaryMagnitude(delta)} (-${formatRatioPercent(ratio)}). ${span}`;
   }
@@ -340,9 +422,18 @@ export function buildEvidenceGraph(input: BuildEvidenceGraphInput): EvidenceGrap
     (snapshot) => comparableStoredBytes(snapshot, growthMetric) !== null,
   ).length;
 
+  const gapBlockedDetail = gapBlockedGrowthDetail(snapshots, options);
   const gaps: EvidenceGap[] = [
     ...sampleGaps(snapshots, options),
-    ...intervalGaps(snapshots, options),
+    ...intervalGaps(snapshots, options).map((gap) =>
+      gapBlockedDetail === null
+        ? gap
+        : {
+            ...gap,
+            // Lead with the growth sentence so the reasoner headline/summary stay honest.
+            detail: `${gapBlockedDetail} ${gap.detail}`,
+          },
+    ),
     ...comparabilityGaps(snapshots),
     ...memoryReadingGaps(snapshots),
     ...attributionGaps(anomalies, attributions),
@@ -350,8 +441,14 @@ export function buildEvidenceGraph(input: BuildEvidenceGraphInput): EvidenceGrap
 
   // Two stored-size readings are what a statement about memory movement is earned with. Fewer than
   // that, and the memory-not-comparable gap is the honest result. The detail distinguishes a flat
-  // window from one that moved and still missed the anomaly rule.
-  if (anomalies.length === 0 && ttlDrift.length === 0 && storedSizeReadings >= 2) {
+  // window from one that moved and still missed the anomaly rule. Supra-threshold growth blocked by
+  // a snapshot gap is already recorded on that gap — do not also claim "no growth detected".
+  if (
+    gapBlockedDetail === null &&
+    anomalies.length === 0 &&
+    ttlDrift.length === 0 &&
+    storedSizeReadings >= 2
+  ) {
     gaps.push({
       kind: 'no-growth-detected',
       detail: noGrowthDetail(snapshots, options),

@@ -1,6 +1,6 @@
 Redis Memory Diagnosis
 Generated  2026-08-25T14:00:00.000Z
-Store      /Users/istvanficzus/PrivateProjects/RedisDetective/packages/core/fixtures/golden/clear-leak
+Store      <fixtures>/clear-leak/snapshots
 Target     stored snapshots only (no live connection)
 Window     2026-08-25T10:00:00.000Z -> 2026-08-25T13:00:00.000Z (4 snapshots)
 

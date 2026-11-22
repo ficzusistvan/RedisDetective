@@ -131,20 +131,15 @@
     "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t19-00-00-000-be5dba0f",
     "generatedAt": "2026-08-25T14:00:00.000Z",
     "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t19-00-00-000-be5dba0f",
-    "headline": "Memory grew 115.2 MiB (+200%), below anomaly thresholds (8 MiB and 2%).",
-    "summary": "Memory grew 115.2 MiB (+200%), below anomaly thresholds (8 MiB and 2%). cache:* contributed the most estimated growth, 120 MiB, as larger values. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.",
+    "headline": "Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval.",
+    "summary": "Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside. Window 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.",
     "likelyCause": null,
     "hintedCandidateShas": [],
     "supportingEvidence": [
       {
-        "evidenceId": "gap:no-growth-detected",
-        "kind": "gap",
-        "statement": "Memory grew 115.2 MiB (+200%), below anomaly thresholds (8 MiB and 2%). cache:* contributed the most estimated growth, 120 MiB, as larger values. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC."
-      },
-      {
         "evidenceId": "gap:snapshot-gap",
         "kind": "gap",
-        "statement": "32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside."
+        "statement": "Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside."
       }
     ],
     "recommendedActions": [
@@ -152,8 +147,7 @@
     ],
     "evidenceStrength": "unclear",
     "unknowns": [
-      "Memory grew 115.2 MiB (+200%), below anomaly thresholds (8 MiB and 2%). cache:* contributed the most estimated growth, 120 MiB, as larger values. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.",
-      "32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside."
+      "Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside."
     ],
     "model": null
   },
@@ -173,13 +167,8 @@
     "ttlDrift": [],
     "gaps": [
       {
-        "kind": "no-growth-detected",
-        "detail": "Memory grew 115.2 MiB (+200%), below anomaly thresholds (8 MiB and 2%). cache:* contributed the most estimated growth, 120 MiB, as larger values. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.",
-        "remedy": null
-      },
-      {
         "kind": "snapshot-gap",
-        "detail": "32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside.",
+        "detail": "Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside.",
         "remedy": "Snapshot more often so a change can be located to a narrower window."
       }
     ]

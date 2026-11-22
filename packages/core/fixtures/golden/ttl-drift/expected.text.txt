@@ -6,9 +6,9 @@ Window     2026-08-25T10:00:00.000Z -> 2026-08-25T11:00:00.000Z (2 snapshots)
 
 Why
 ---
-session:* TTL coverage moved from 100% to 20%.
+session:* TTL coverage fell from 100% to 20%.
 
-session:* TTL coverage moved from 100% to 20% (ttl-coverage-declining). Across the window 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.
+session:* TTL coverage fell from 100% to 20% (keys are being written without an expiry). Across the window 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.
 
 Named cause  none  [moderate evidence]
 

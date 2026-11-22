@@ -216,8 +216,9 @@ The npm packages are public; this repo can stay private.
 3. Push a tag `v<that version>` from `main` (`git tag v0.6.0 && git push origin v0.6.0`).
 
 The release workflow runs `pnpm verify`, checks that the tag matches both package versions,
-publishes `packages/core/publish` first, then `packages/cli/publish`. npm provenance is attached
-only if the source repository is public.
+publishes `packages/core/publish`, waits until that version’s tarball downloads (~15 min
+timeout), publishes `packages/cli/publish`, then waits until the CLI tarball downloads. npm
+provenance is attached only if the source repository is public.
 
 The README is what npm users see. Keep it operator-facing; contributor and release notes live here.
 

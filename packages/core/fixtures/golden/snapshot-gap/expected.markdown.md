@@ -9,7 +9,7 @@
 
 Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval.
 
-Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside. Window 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.
+Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 9 h passed between gap-a and gap-b, beyond the 6 h limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside. Window 2026-08-25 10:00 UTC to 2026-08-25 19:00 UTC.
 
 **Named cause:** none (unclear evidence)
 
@@ -19,7 +19,7 @@ Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attribut
 
 ## Limitations
 
-**Unobserved interval.** Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 32400000ms passed between gap-a and gap-b, beyond the 21600000ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside. Snapshot more often so a change can be located to a narrower window.
+**Unobserved interval.** Memory grew 115.2 MiB (+200%), but a 9 h gap between snapshots prevents attributing it; capture snapshots at a shorter interval. 9 h passed between gap-a and gap-b, beyond the 6 h limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside. Snapshot more often so a change can be located to a narrower window.
 
 ## Latest snapshot
 

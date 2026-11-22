@@ -1,4 +1,5 @@
 import type {
+  AnomalyKind,
   EvidenceGraph,
   EvidenceStrength,
   Explanation,
@@ -38,6 +39,14 @@ const MECHANISM_ACTION: Record<GrowthMechanism, string> = {
     'Re-run with a larger --sample-size to separate "more keys" from "bigger values" for this pattern.',
 };
 
+/** Plain-language gloss for each TTL-drift kind. Never emit the kebab-case kind id in prose. */
+const TTL_DRIFT_PHRASE: Record<TtlDriftKind, string> = {
+  'ttl-removed': 'keys are being written without an expiry',
+  'ttl-coverage-declining': 'keys are being written without an expiry',
+  'ttl-lengthened': 'keys still expire, but live longer',
+  'never-expiring-growth': 'a pattern that never expired is still growing',
+};
+
 const TTL_ACTION: Record<TtlDriftKind, string> = {
   'ttl-removed':
     'Highest-value finding here. Something stopped setting an expiry on this pattern; nothing will reclaim these keys until it is fixed.',
@@ -47,6 +56,15 @@ const TTL_ACTION: Record<TtlDriftKind, string> = {
     'A longer TTL raises the steady-state footprint. Confirm the new lifetime was intended.',
   'never-expiring-growth':
     'These keys have never had a TTL. If they are not meant to be permanent, this is where to add one.',
+};
+
+/** Plain-language gloss for each anomaly kind. Never emit the kebab-case kind id in prose. */
+const ANOMALY_PHRASE: Record<AnomalyKind, string> = {
+  'memory-growth': 'Memory grew steadily',
+  'memory-step-change': 'Memory jumped in a single interval',
+  'fragmentation-growth': 'Allocator overhead grew while stored data stayed flat',
+  'key-count-growth': 'Key count grew faster than memory',
+  'eviction-onset': 'The instance started evicting keys',
 };
 
 function weakestStrength(values: readonly EvidenceStrength[]): EvidenceStrength {
@@ -104,6 +122,37 @@ function formatUtcInstant(iso: string): string {
 
 function percent(value: number): string {
   return `${String(Math.round(value * 100))}%`;
+}
+
+/**
+ * One sentence for a TTL drift event, using a human phrase instead of the internal kind id.
+ */
+function ttlDriftStatement(event: TTLDriftEvent): string {
+  const before = percent(event.ttlCoverageBefore);
+  const after = percent(event.ttlCoverageAfter);
+  const gloss = TTL_DRIFT_PHRASE[event.kind];
+  if (event.kind === 'never-expiring-growth') {
+    return `${event.pattern} never carried a TTL and is still growing (${gloss}).`;
+  }
+  if (event.kind === 'ttl-lengthened') {
+    return `${event.pattern} TTL coverage moved from ${before} to ${after} (${gloss}).`;
+  }
+  return `${event.pattern} TTL coverage fell from ${before} to ${after} (${gloss}).`;
+}
+
+function anomalyStatement(
+  kind: AnomalyKind,
+  metric: string,
+  windowFrom: string,
+  windowTo: string,
+  deltaBytes: number | null,
+): string {
+  const phrase = ANOMALY_PHRASE[kind];
+  const window = `between ${windowFrom} and ${windowTo}`;
+  if (deltaBytes === null) {
+    return `${phrase} on ${metric} ${window}.`;
+  }
+  return `${phrase} (${formatBytes(deltaBytes)} on ${metric}) ${window}.`;
 }
 
 function primaryAttribution(graph: EvidenceGraph): PatternAttribution | null {
@@ -217,17 +266,20 @@ export function summarizeEvidenceDeterministically(input: ReasonerInput): Explan
     causeCitations.push({
       evidenceId: anomaly.eventId,
       kind: 'anomaly',
-      statement:
-        anomaly.deltaBytes === null
-          ? `${anomaly.kind} on ${anomaly.metric} between ${formatUtcInstant(anomaly.window.from)} and ${formatUtcInstant(anomaly.window.to)}.`
-          : `${anomaly.kind} of ${formatBytes(anomaly.deltaBytes)} on ${anomaly.metric} between ${formatUtcInstant(anomaly.window.from)} and ${formatUtcInstant(anomaly.window.to)}.`,
+      statement: anomalyStatement(
+        anomaly.kind,
+        anomaly.metric,
+        formatUtcInstant(anomaly.window.from),
+        formatUtcInstant(anomaly.window.to),
+        anomaly.deltaBytes,
+      ),
     });
   }
   for (const event of driftEvents) {
     causeCitations.push({
       evidenceId: event.eventId,
       kind: 'ttl-drift',
-      statement: `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
+      statement: ttlDriftStatement(event),
     });
   }
   const commitCitations: ExplanationCitation[] = commits.map((commit) => ({
@@ -317,7 +369,7 @@ function explanationFromTtlDriftOnly(input: ReasonerInput): Explanation {
   const citations: ExplanationCitation[] = ranked.map((event) => ({
     evidenceId: event.eventId,
     kind: 'ttl-drift' as const,
-    statement: `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
+    statement: ttlDriftStatement(event),
   }));
   for (const gap of graph.gaps) {
     citations.push({
@@ -335,10 +387,7 @@ function explanationFromTtlDriftOnly(input: ReasonerInput): Explanation {
   ]);
 
   const windowText = `${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}`;
-  const driftSentences = ranked.map(
-    (event) =>
-      `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)} (${event.kind}).`,
-  );
+  const driftSentences = ranked.map((event) => ttlDriftStatement(event));
   const summary = [
     ...driftSentences,
     `Across the window ${windowText}.`,
@@ -347,11 +396,18 @@ function explanationFromTtlDriftOnly(input: ReasonerInput): Explanation {
     .filter((part): part is string => part !== null)
     .join(' ');
 
+  const headline =
+    primary.kind === 'never-expiring-growth'
+      ? `${primary.pattern} never carried a TTL and is still growing.`
+      : primary.kind === 'ttl-lengthened'
+        ? `${primary.pattern} TTL coverage moved from ${percent(primary.ttlCoverageBefore)} to ${percent(primary.ttlCoverageAfter)}.`
+        : `${primary.pattern} TTL coverage fell from ${percent(primary.ttlCoverageBefore)} to ${percent(primary.ttlCoverageAfter)}.`;
+
   return {
     explanationId: explanationId(graph.graphId),
     generatedAt: input.generatedAt,
     graphId: graph.graphId,
-    headline: `${primary.pattern} TTL coverage moved from ${percent(primary.ttlCoverageBefore)} to ${percent(primary.ttlCoverageAfter)}.`,
+    headline,
     summary,
     likelyCause: null,
     hintedCandidateShas: [],
@@ -409,7 +465,7 @@ function summaryWithoutCause(graph: EvidenceGraph, input: ReasonerInput): string
   if (graph.ttlDrift.length > 0) {
     const event = graph.ttlDrift[0];
     if (event !== undefined) {
-      return `${event.pattern} TTL coverage moved from ${percent(event.ttlCoverageBefore)} to ${percent(event.ttlCoverageAfter)}. Window ${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}.`;
+      return `${ttlDriftStatement(event)} Window ${formatUtcInstant(graph.window.from)} to ${formatUtcInstant(graph.window.to)}.`;
     }
   }
 

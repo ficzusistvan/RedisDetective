@@ -181,8 +181,11 @@ describe('summarizeEvidenceDeterministically', () => {
     const explanation = summarizeEvidenceDeterministically(input);
 
     expect(explanation.likelyCause).toBeNull();
-    expect(explanation.headline).toBe('session:* TTL coverage moved from 100% to 20%.');
-    expect(explanation.summary).toContain('session:* TTL coverage moved from 100% to 20%');
+    expect(explanation.headline).toBe('session:* TTL coverage fell from 100% to 20%.');
+    expect(explanation.summary).toContain(
+      'session:* TTL coverage fell from 100% to 20% (keys are being written without an expiry)',
+    );
+    expect(explanation.summary).not.toContain('ttl-coverage-declining');
     expect(explanation.summary.toLowerCase()).not.toContain('no ttl drift');
     expect(explanation.headline.toLowerCase()).not.toContain('does not support naming a cause');
     expect(explanation.evidenceStrength).toBe('moderate');

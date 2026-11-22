@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { EVIDENCE_DEFAULTS, buildEvidenceGraph } from '@redis-detective/evidence';
+import { buildEvidenceGraph } from '@redis-detective/evidence';
 import type { EvidenceGapKind, RedisSnapshot } from '@redis-detective/core-types';
 
 import { hoursIn, patternFixture, series, snapshotFixture } from './helpers/snapshot-fixture.js';
@@ -162,8 +162,10 @@ describe('buildEvidenceGraph', () => {
       const drift = graph.ttlDrift.find((event) => event.pattern === attribution?.pattern);
 
       expect(drift).toBeDefined();
-      expect(attribution?.observations.join(' ')).toContain('Corroborated by TTL drift event');
-      expect(attribution?.observations.join(' ')).toContain(drift?.eventId ?? 'missing');
+      expect(attribution?.observations.join(' ')).toContain(
+        'Corroborated by TTL drift on the same pattern.',
+      );
+      expect(attribution?.observations.join(' ')).not.toContain(drift?.eventId ?? 'missing');
     });
 
     it('links every attribution to an anomaly that is present in the graph', () => {
@@ -219,7 +221,9 @@ describe('buildEvidenceGraph', () => {
       // The interval was not analysed, so no anomaly may be claimed from it.
       expect(graph.anomalies).toEqual([]);
       const snapshotGap = graph.gaps.find((gap) => gap.kind === 'snapshot-gap');
-      expect(snapshotGap?.detail).toContain(String(EVIDENCE_DEFAULTS.maxSnapshotGapMs));
+      expect(snapshotGap?.detail).toContain('6 h');
+      expect(snapshotGap?.detail).toContain('9 h');
+      expect(snapshotGap?.detail).not.toMatch(/\d+ms\b/);
       // Growth cleared both thresholds; the gap is why it was not attributed — not "below thresholds".
       expect(snapshotGap?.detail).toMatch(
         /Memory grew .+ \(\+200%\), but a 9 h gap between snapshots prevents attributing it/,

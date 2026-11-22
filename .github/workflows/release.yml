@@ -12,7 +12,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Verify + two publishes + up to ~15 min wait per package.
+    timeout-minutes: 45
     permissions:
       contents: read
       # Needed only when the source repo is public (npm provenance). Harmless on a private repo.
@@ -55,29 +56,12 @@ jobs:
             echo "Skipping npm provenance: source repository is not public."
             npm publish --access public
           fi
-      - name: Wait until @redis-detective/core is resolvable on the registry
+      - name: Wait until @redis-detective/core tarball downloads
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           version="$(node -p "require('./packages/core/package.json').version")"
-          package="@redis-detective/core@${version}"
-          tarball="/tmp/redis-detective-core-${version}.tgz"
-          echo "Waiting for ${package} to appear on npm…"
-          for attempt in $(seq 1 36); do
-            if npm view "${package}" version >/tmp/core-view.txt 2>/tmp/core-view.err \
-              && [ "$(tr -d '[:space:]' </tmp/core-view.txt)" = "${version}" ]; then
-              dist_tarball="$(npm view "${package}" dist.tarball)"
-              if [ -n "$dist_tarball" ] && curl -fsSL "$dist_tarball" -o "$tarball"; then
-                echo "Resolved ${package}; downloaded $(wc -c <"$tarball") bytes from ${dist_tarball}."
-                exit 0
-              fi
-            fi
-            echo "Attempt ${attempt}/36: not ready yet; sleeping 10s."
-            sleep 10
-          done
-          echo "Timed out waiting for ${package} on npm." >&2
-          cat /tmp/core-view.err >&2 || true
-          exit 1
+          bash scripts/wait-for-npm-tarball.sh "@redis-detective/core" "${version}"
       - name: Publish redis-detective to npm
         working-directory: packages/cli/publish
         env:
@@ -92,3 +76,9 @@ jobs:
             echo "Skipping npm provenance: source repository is not public."
             npm publish --access public
           fi
+      - name: Wait until redis-detective tarball downloads
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version="$(node -p "require('./packages/cli/package.json').version")"
+          bash scripts/wait-for-npm-tarball.sh "redis-detective" "${version}"

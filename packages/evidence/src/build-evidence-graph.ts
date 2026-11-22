@@ -15,6 +15,7 @@ import { describePatternContributors } from './describe-pattern-contributors.js'
 import { detectMemoryAnomalies } from './detect-memory-anomalies.js';
 import { detectTtlDrift } from './detect-ttl-drift.js';
 import { resolveEvidenceOptions } from './evidence-options.js';
+import { formatDuration } from './format-duration.js';
 import {
   formatBinaryMagnitude,
   formatRatioPercent,
@@ -104,7 +105,7 @@ function intervalGaps(
     if (gap > options.maxSnapshotGapMs) {
       gaps.push({
         kind: 'snapshot-gap',
-        detail: `${gap}ms passed between ${before.snapshotId} and ${after.snapshotId}, beyond the ${options.maxSnapshotGapMs}ms limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside.`,
+        detail: `${formatDuration(gap)} passed between ${before.snapshotId} and ${after.snapshotId}, beyond the ${formatDuration(options.maxSnapshotGapMs)} limit. This interval was not analysed, because a change anywhere inside it would look the same from the outside.`,
         remedy: 'Snapshot more often so a change can be located to a narrower window.',
       });
     }
@@ -232,7 +233,9 @@ function crossReferenceTtlDrift(
       ...attribution,
       observations: [
         ...attribution.observations,
-        `Corroborated by TTL drift event(s) ${matching.map((event) => event.eventId).join(', ')} on the same pattern.`,
+        matching.length === 1
+          ? 'Corroborated by TTL drift on the same pattern.'
+          : `Corroborated by ${String(matching.length)} TTL drift events on the same pattern.`,
       ],
     };
   });
@@ -255,15 +258,6 @@ function largestSnapshotGapMs(snapshots: readonly RedisSnapshot[]): number | nul
     }
   }
   return largest;
-}
-
-/**
- * Human duration for a gap sentence. Whole hours stay whole (`9 h`); otherwise one decimal.
- */
-function formatGapDuration(ms: number): string {
-  const hours = ms / (60 * 60 * 1000);
-  const rounded = Math.round(hours * 10) / 10;
-  return Number.isInteger(rounded) ? `${String(rounded)} h` : `${rounded.toFixed(1)} h`;
 }
 
 interface StoredSizeSpan {
@@ -330,7 +324,7 @@ function gapBlockedGrowthDetail(
   if (largestGap === null || largestGap <= options.maxSnapshotGapMs) {
     return null;
   }
-  return `Memory grew ${formatBinaryMagnitude(span.delta)} (+${formatRatioPercent(span.ratio)}), but a ${formatGapDuration(largestGap)} gap between snapshots prevents attributing it; capture snapshots at a shorter interval.`;
+  return `Memory grew ${formatBinaryMagnitude(span.delta)} (+${formatRatioPercent(span.ratio)}), but a ${formatDuration(largestGap)} gap between snapshots prevents attributing it; capture snapshots at a shorter interval.`;
 }
 
 /**

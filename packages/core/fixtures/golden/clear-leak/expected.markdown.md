@@ -37,7 +37,7 @@ Mechanism: keys stopped expiring
 
 - Accounts for 100.0% of the key_count growth in this window.
 
-- Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+- Corroborated by TTL drift on the same pattern.
 
 → Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
 
@@ -55,7 +55,7 @@ Mechanism: keys stopped expiring
 
 - Accounts for 100.0% of the used_memory_dataset growth in this window.
 
-- Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+- Corroborated by TTL drift on the same pattern.
 
 → Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
 

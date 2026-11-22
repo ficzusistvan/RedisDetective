@@ -59,6 +59,7 @@ export {
   SnapshotOrderingError,
   sortSnapshotsChronologically,
   ttlCoverage,
+  formatDuration,
 } from '@redis-detective/evidence';
 export type {
   EvidenceOptions,

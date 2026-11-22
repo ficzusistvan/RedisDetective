@@ -261,12 +261,12 @@
         {
           "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
           "kind": "anomaly",
-          "statement": "key-count-growth on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+          "statement": "Key count grew faster than memory on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
         },
         {
           "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
           "kind": "ttl-drift",
-          "statement": "cart:items:* TTL coverage moved from 100% to 0% (ttl-removed)."
+          "statement": "cart:items:* TTL coverage fell from 100% to 0% (keys are being written without an expiry)."
         }
       ]
     },
@@ -280,12 +280,12 @@
       {
         "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
         "kind": "anomaly",
-        "statement": "key-count-growth on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+        "statement": "Key count grew faster than memory on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
       },
       {
         "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
         "kind": "ttl-drift",
-        "statement": "cart:items:* TTL coverage moved from 100% to 0% (ttl-removed)."
+        "statement": "cart:items:* TTL coverage fell from 100% to 0% (keys are being written without an expiry)."
       }
     ],
     "recommendedActions": [
@@ -374,7 +374,7 @@
           "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
           "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
           "Accounts for 100.0% of the key_count growth in this window.",
-          "Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern."
+          "Corroborated by TTL drift on the same pattern."
         ]
       },
       {
@@ -397,7 +397,7 @@
           "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
           "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
           "Accounts for 100.0% of the used_memory_dataset growth in this window.",
-          "Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern."
+          "Corroborated by TTL drift on the same pattern."
         ]
       }
     ],

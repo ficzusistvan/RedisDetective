@@ -16,6 +16,7 @@ const REQUIRED_VALUES = [
   'explainEvidence',
   'toDiagnosisJson',
   'diagnoseSnapshots',
+  'formatDuration',
   'StoredSnapshotError',
   'EvidenceOptionsError',
   'SnapshotOrderingError',

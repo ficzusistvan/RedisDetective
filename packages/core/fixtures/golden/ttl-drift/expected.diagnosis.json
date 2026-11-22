@@ -131,15 +131,15 @@
     "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-59e5ce63",
     "generatedAt": "2026-08-25T14:00:00.000Z",
     "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-59e5ce63",
-    "headline": "session:* TTL coverage moved from 100% to 20%.",
-    "summary": "session:* TTL coverage moved from 100% to 20% (ttl-coverage-declining). Across the window 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
+    "headline": "session:* TTL coverage fell from 100% to 20%.",
+    "summary": "session:* TTL coverage fell from 100% to 20% (keys are being written without an expiry). Across the window 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
     "likelyCause": null,
     "hintedCandidateShas": [],
     "supportingEvidence": [
       {
         "evidenceId": "ttl-drift-session-ttl-coverage-declining-ttl-a-ttl-b-5126abcf",
         "kind": "ttl-drift",
-        "statement": "session:* TTL coverage moved from 100% to 20% (ttl-coverage-declining)."
+        "statement": "session:* TTL coverage fell from 100% to 20% (keys are being written without an expiry)."
       }
     ],
     "recommendedActions": [

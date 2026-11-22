@@ -70,6 +70,39 @@ function assertProseGoldenIsPortable(text: string, caseName: string): void {
   expect(text).toContain(`<fixtures>/${caseName}/snapshots`);
 }
 
+/**
+ * Explanation prose must stay readable: no raw millisecond suffixes and no kebab-case internal
+ * kind / mechanism identifiers. Graph `kind` fields are out of scope — only strings a person reads.
+ */
+function collectExplanationProse(diagnosis: DiagnosisJson): readonly string[] {
+  const explanation = diagnosis.explanation;
+  const parts: string[] = [
+    explanation.headline,
+    explanation.summary,
+    ...explanation.recommendedActions,
+    ...explanation.unknowns,
+  ];
+  for (const citation of explanation.supportingEvidence) {
+    parts.push(citation.statement);
+  }
+  if (explanation.likelyCause !== null) {
+    parts.push(explanation.likelyCause.description);
+    for (const citation of explanation.likelyCause.citations) {
+      parts.push(citation.statement);
+    }
+  }
+  return parts;
+}
+
+function assertExplanationProseIsHuman(diagnosis: DiagnosisJson, caseName: string): void {
+  const prose = collectExplanationProse(diagnosis).join('\n');
+  expect(prose, `${caseName} explanation must not contain raw <digits>ms`).not.toMatch(/\d+ms\b/);
+  // Internal evidence kind / mechanism / TTL-drift ids are kebab-case tokens.
+  expect(prose, `${caseName} explanation must not contain kebab-case internal ids`).not.toMatch(
+    /\b(?:ttl-(?:removed|coverage-declining|lengthened)|never-expiring-growth|memory-(?:growth|step-change)|fragmentation-growth|key-count-growth|eviction-onset|more-keys|larger-values|keys-not-expiring|snapshot-gap|insufficient-snapshots|sample-too-small|unattributed-growth|no-growth-detected|pattern-not-comparable|memory-not-comparable|no-repository-connected|github-unavailable)\b/,
+  );
+}
+
 describe('diagnoseSnapshots golden fixtures', () => {
   for (const caseName of CASES) {
     it(`${caseName} matches expected.diagnosis.json`, async () => {
@@ -91,6 +124,7 @@ describe('diagnoseSnapshots golden fixtures', () => {
       }
 
       expect(actual).toEqual(loadExpected(caseName));
+      assertExplanationProseIsHuman(actual, caseName);
     });
 
     it(`${caseName} text and markdown goldens are portable`, () => {

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.2
+
+Small wording and release-timing fixes for `@redis-detective/core` and `redis-detective`.
+
+### Diagnosis wording
+
+- **Readable durations.** Gap explanations and other duration prose use human units (`9 h`,
+  `6 h`, `45 min`, `1 h 30 min`) via `formatDuration(ms)`. Machine-readable graph fields still
+  keep millisecond numbers.
+- **No internal kind ids in explanations.** TTL-drift (and anomaly) summaries use plain phrases
+  instead of kebab-case kind names such as `ttl-coverage-declining`. The `kind` field on the JSON
+  graph is unchanged.
+
+### Packaging
+
+- After each `npm publish`, the release workflow polls until `npm pack <pkg>@<version>` (or the
+  `dist.tarball` URL) actually downloads, with a ~15 minute timeout. `redis-detective` publishes
+  only after the core tarball is downloadable, and the job ends only after the CLI tarball is
+  downloadable — avoiding the 0.6.1 window where `npm view` listed the version but the tarball
+  still 404'd.
+
 ## 0.6.1
 
 Fixes found while verifying the 0.6.0 publish of `@redis-detective/core` and `redis-detective`.

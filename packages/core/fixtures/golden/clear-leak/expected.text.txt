@@ -27,7 +27,7 @@ Causes
    - estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).
    - mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
    - Accounts for 100.0% of the key_count growth in this window.
-   - Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+   - Corroborated by TTL drift on the same pattern.
    → Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
 
 2. cart:items:* accounts for 100.0% of the used_memory_dataset growth  [strong evidence]
@@ -37,7 +37,7 @@ Causes
    - estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).
    - mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
    - Accounts for 100.0% of the used_memory_dataset growth in this window.
-   - Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+   - Corroborated by TTL drift on the same pattern.
    → Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
 
 What changed

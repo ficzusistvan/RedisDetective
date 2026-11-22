@@ -9,6 +9,7 @@ import type { ResolvedEvidenceOptions } from './evidence-options.js';
 import type { GrowthMetric } from './select-growth-metric.js';
 import { createEvidenceId } from './create-evidence-id.js';
 import { describeChange } from './describe-change.js';
+import { formatDuration } from './format-duration.js';
 import { gradeEvidenceStrength } from './grade-evidence-strength.js';
 import { comparableStoredBytes, selectGrowthMetric } from './select-growth-metric.js';
 import { relativeChange } from './relative-change.js';
@@ -149,7 +150,7 @@ function detectStepChange(
       observations: [
         describeChange(metric, valueBefore, valueAfter, 'bytes'),
         describeChange('key count', keysBefore, keysAfter, 'keys'),
-        `Change occurred within a single ${gapMs(interval.before, interval.after)}ms interval, so it is a step rather than a trend.`,
+        `Change occurred within a single ${formatDuration(gapMs(interval.before, interval.after))} interval, so it is a step rather than a trend.`,
       ],
     },
     [interval.before, interval.after],

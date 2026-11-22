@@ -25,6 +25,8 @@ export type { GrowthMetric } from './select-growth-metric.js';
 export { describeChange } from './describe-change.js';
 export type { ChangeUnit } from './describe-change.js';
 
+export { formatDuration } from './format-duration.js';
+
 export { gradeEvidenceStrength } from './grade-evidence-strength.js';
 export type { EvidenceStrengthInput } from './grade-evidence-strength.js';
 

@@ -1,0 +1,98 @@
+# Redis Memory Diagnosis
+
+- **Generated:** 2026-08-25T14:00:00.000Z
+- **Store:** /Users/istvanficzus/PrivateProjects/RedisDetective/packages/core/fixtures/golden/clear-leak
+- **Target:** stored snapshots only (no live connection)
+- **Window:** 2026-08-25T10:00:00.000Z → 2026-08-25T13:00:00.000Z (4 snapshots)
+
+## Why
+
+cart:items:* stopped expiring and accounts for most of the memory growth.
+
+Between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC, used memory moved by +24 MiB. cart:items:* accounts for 100% of that growth (keys stopped expiring). See limitations for what this sample could not establish.
+
+**Named cause:** `cart:items:*` (strong evidence)
+
+cart:items:* grew by +24 MiB (100% of the anomaly) by keys stopped expiring. TTL coverage on that pattern moved from 100% to 0%.
+
+### What to do
+
+- Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
+- Highest-value finding here. Something stopped setting an expiry on this pattern; nothing will reclaim these keys until it is fixed.
+- When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis. Connecting a repo lists Commit candidates for a human look — it does not name a Git Cause.
+
+## Causes
+
+**`cart:items:*`** accounts for 100.0% of the key_count growth (strong evidence)
+
+Mechanism: keys stopped expiring
+
+~24.0 MB est., +~60,000 keys
+
+- estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).
+
+- estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).
+
+- mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
+
+- Accounts for 100.0% of the key_count growth in this window.
+
+- Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+
+→ Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
+
+**`cart:items:*`** accounts for 100.0% of the used_memory_dataset growth (strong evidence)
+
+Mechanism: keys stopped expiring
+
+~24.0 MB est., +~60,000 keys
+
+- estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).
+
+- estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).
+
+- mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
+
+- Accounts for 100.0% of the used_memory_dataset growth in this window.
+
+- Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern.
+
+→ Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
+
+## What changed
+
+**Key count grew faster than memory** (strong evidence)
+
+- key count moved from 10000 keys to 70000 keys (+600.0%).
+- Key count rose faster than used_memory_dataset, so the instance is accumulating keys rather than storing larger values.
+
+**Memory grew steadily** (strong evidence)
+
+- used_memory_dataset moved from 60397978 bytes to 83047219 bytes (+37.5%).
+- key count moved from 10000 keys to 70000 keys (+600.0%).
+- used_memory_dataset rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump.
+
+## TTL drift
+
+**`cart:items:*`** — TTLs disappeared (strong evidence)
+
+Coverage 100.0% → 0.0%
+
+- TTL coverage for cart:items:* moved from 100.0% to 0.0%, measured across 100 sampled keys before and 100 after.
+- Keys under cart:items:* carried a TTL and now effectively none do, which is what a SET losing its EX argument or an EXPIRE call being dropped looks like.
+
+→ Highest-value finding here. Something stopped setting an expiry on this pattern; nothing will reclaim these keys until it is fixed.
+
+## Limitations
+
+**No repository connected.** No GitHub repository was connected, so Commit candidates in the growth window were not listed. When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis. Connecting a repo lists Commit candidates for a human look — it does not name a Git Cause.
+
+## Latest snapshot
+
+- **Used memory:** 88.0 MB
+- **Keys:** 70,000
+- **Top pattern:** `cart:items:*` (~54.0 MB est., TTL 0.0%)
+- **Sample:** 1,000 keys (10.0% of key space)
+
+_Figures derived from a bounded sample are estimates, not measurements. Strength is a qualitative band, not a confidence score._
+

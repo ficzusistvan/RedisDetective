@@ -1,0 +1,28 @@
+Redis Memory Diagnosis
+Generated  2026-08-25T14:00:00.000Z
+Store      /Users/istvanficzus/PrivateProjects/RedisDetective/packages/core/fixtures/golden/ttl-drift
+Target     stored snapshots only (no live connection)
+Window     2026-08-25T10:00:00.000Z -> 2026-08-25T11:00:00.000Z (2 snapshots)
+
+Why
+---
+The evidence does not support naming a cause.
+
+No anomaly, attribution or TTL drift was established from the 2 snapshot(s) supplied at 2026-08-25 14:00 UTC.
+
+Named cause  none  [unclear evidence]
+
+TTL drift
+---------
+1. session:* — fewer keys carry a TTL than before  [moderate evidence]
+   Coverage 100.0% -> 20.0%
+   - TTL coverage for session:* moved from 100.0% to 20.0%, measured across 100 sampled keys before and 100 after.
+   - Coverage fell by 80.0 percentage points, so some writers still set an expiry and others no longer do.
+   → Some writers still set an expiry and others no longer do. Look for a second write path added to this pattern.
+
+Latest snapshot
+---------------
+Used memory    66.0 MB
+Keys           100,000
+Top pattern    session:*  (~52.0 MB est., TTL 20.0%)
+Sample         1,000 keys (10.0% of key space)

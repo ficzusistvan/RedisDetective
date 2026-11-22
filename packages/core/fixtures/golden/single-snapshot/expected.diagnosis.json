@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "reportType": "diagnosis",
+  "generatedAt": "2026-08-25T14:00:00.000Z",
+  "target": null,
+  "storeLocation": "<golden>/single-snapshot",
+  "savedLocation": null,
+  "repository": null,
+  "lookbackHours": null,
+  "commitLookupSkippedBecauseNoGrowth": false,
+  "snapshots": [
+    {
+      "snapshotId": "only",
+      "capturedAt": "2026-08-25T10:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 134217728,
+        "usedMemoryRssBytes": 161061274,
+        "usedMemoryDatasetBytes": 120795955,
+        "usedMemoryPeakBytes": 134217728,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "session:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 10000,
+          "estimatedBytes": 52428800,
+          "bytesMeasured": true,
+          "keysWithTtl": 100,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    }
+  ],
+  "commitCandidates": [],
+  "explanation": {
+    "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t10-00-00-000-d6e91f57",
+    "generatedAt": "2026-08-25T14:00:00.000Z",
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t10-00-00-000-d6e91f57",
+    "headline": "Not enough snapshots to explain the growth.",
+    "summary": "Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there. Window 2026-08-25 10:00 UTC to 2026-08-25 10:00 UTC.",
+    "likelyCause": null,
+    "hintedCandidateShas": [],
+    "supportingEvidence": [
+      {
+        "evidenceId": "gap:insufficient-snapshots",
+        "kind": "gap",
+        "statement": "Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there."
+      }
+    ],
+    "recommendedActions": [
+      "Run the health check again later and pass both snapshots, so the two can be compared."
+    ],
+    "evidenceStrength": "unclear",
+    "unknowns": [
+      "Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there."
+    ],
+    "model": null
+  },
+  "graph": {
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t10-00-00-000-d6e91f57",
+    "builtAt": "2026-08-25T14:00:00.000Z",
+    "window": {
+      "from": "2026-08-25T10:00:00.000Z",
+      "to": "2026-08-25T10:00:00.000Z"
+    },
+    "snapshotIds": [
+      "only"
+    ],
+    "anomalies": [],
+    "attributions": [],
+    "ttlDrift": [],
+    "gaps": [
+      {
+        "kind": "insufficient-snapshots",
+        "detail": "Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there.",
+        "remedy": "Run the health check again later and pass both snapshots, so the two can be compared."
+      }
+    ]
+  }
+}

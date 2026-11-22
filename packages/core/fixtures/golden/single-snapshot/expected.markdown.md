@@ -1,0 +1,32 @@
+# Redis Memory Diagnosis
+
+- **Generated:** 2026-08-25T14:00:00.000Z
+- **Store:** /Users/istvanficzus/PrivateProjects/RedisDetective/packages/core/fixtures/golden/single-snapshot
+- **Target:** stored snapshots only (no live connection)
+- **Window:** 2026-08-25T10:00:00.000Z → 2026-08-25T10:00:00.000Z (1 snapshot)
+
+## Why
+
+Not enough snapshots to explain the growth.
+
+Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there. Window 2026-08-25 10:00 UTC to 2026-08-25 10:00 UTC.
+
+**Named cause:** none (unclear evidence)
+
+### What to do
+
+- Run the health check again later and pass both snapshots, so the two can be compared.
+
+## Limitations
+
+**Not enough snapshots.** Growth needs at least two snapshots to establish; 1 was supplied. A single snapshot shows what is in the instance, never how it got there. Run the health check again later and pass both snapshots, so the two can be compared.
+
+## Latest snapshot
+
+- **Used memory:** 128.0 MB
+- **Keys:** 100,000
+- **Top pattern:** `session:*` (~50.0 MB est., TTL 100.0%)
+- **Sample:** 1,000 keys (10.0% of key space)
+
+_Figures derived from a bounded sample are estimates, not measurements. Strength is a qualitative band, not a confidence score._
+

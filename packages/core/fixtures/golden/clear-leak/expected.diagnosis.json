@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 1,
+  "reportType": "diagnosis",
+  "generatedAt": "2026-08-25T14:00:00.000Z",
+  "target": null,
+  "storeLocation": "<golden>/clear-leak",
+  "savedLocation": null,
+  "repository": null,
+  "lookbackHours": null,
+  "commitLookupSkippedBecauseNoGrowth": false,
+  "snapshots": [
+    {
+      "snapshotId": "leak-1",
+      "capturedAt": "2026-08-25T10:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 67108864,
+        "usedMemoryRssBytes": 80530637,
+        "usedMemoryDatasetBytes": 60397978,
+        "usedMemoryPeakBytes": 67108864,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 10000,
+          "keysWithExpiry": 9000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cart:items:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 1000,
+          "estimatedBytes": 31457280,
+          "bytesMeasured": true,
+          "keysWithTtl": 100,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "cart:items:aaa",
+            "cart:items:bbb"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "leak-2",
+      "capturedAt": "2026-08-25T11:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 75497472,
+        "usedMemoryRssBytes": 90596966,
+        "usedMemoryDatasetBytes": 67947725,
+        "usedMemoryPeakBytes": 75497472,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 30000,
+          "keysWithExpiry": 9000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cart:items:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 21000,
+          "estimatedBytes": 39845888,
+          "bytesMeasured": true,
+          "keysWithTtl": 70,
+          "keysWithoutTtl": 30,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "cart:items:aaa",
+            "cart:items:bbb"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "leak-3",
+      "capturedAt": "2026-08-25T12:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 83886080,
+        "usedMemoryRssBytes": 100663296,
+        "usedMemoryDatasetBytes": 75497472,
+        "usedMemoryPeakBytes": 83886080,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 50000,
+          "keysWithExpiry": 9000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cart:items:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 41000,
+          "estimatedBytes": 48234496,
+          "bytesMeasured": true,
+          "keysWithTtl": 30,
+          "keysWithoutTtl": 70,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "cart:items:aaa",
+            "cart:items:bbb"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "leak-4",
+      "capturedAt": "2026-08-25T13:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 92274688,
+        "usedMemoryRssBytes": 110729626,
+        "usedMemoryDatasetBytes": 83047219,
+        "usedMemoryPeakBytes": 92274688,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 70000,
+          "keysWithExpiry": 9000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cart:items:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 61000,
+          "estimatedBytes": 56623104,
+          "bytesMeasured": true,
+          "keysWithTtl": 0,
+          "keysWithoutTtl": 100,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "cart:items:aaa",
+            "cart:items:bbb"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    }
+  ],
+  "commitCandidates": [],
+  "explanation": {
+    "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t13-00-00-000-6c530308",
+    "generatedAt": "2026-08-25T14:00:00.000Z",
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t13-00-00-000-6c530308",
+    "headline": "cart:items:* stopped expiring and accounts for most of the memory growth.",
+    "summary": "Between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC, used memory moved by +24 MiB. cart:items:* accounts for 100% of that growth (keys stopped expiring). See limitations for what this sample could not establish.",
+    "likelyCause": {
+      "pattern": "cart:items:*",
+      "description": "cart:items:* grew by +24 MiB (100% of the anomaly) by keys stopped expiring. TTL coverage on that pattern moved from 100% to 0%.",
+      "citations": [
+        {
+          "evidenceId": "attribution-anomaly-key-count-growth-key-count-leak-1-leak-4-b5bb68f4",
+          "kind": "attribution",
+          "statement": "cart:items:* accounts for 100% of the growth by keys stopped expiring."
+        },
+        {
+          "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
+          "kind": "anomaly",
+          "statement": "key-count-growth on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+        },
+        {
+          "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
+          "kind": "ttl-drift",
+          "statement": "cart:items:* TTL coverage moved from 100% to 0% (ttl-removed)."
+        }
+      ]
+    },
+    "hintedCandidateShas": [],
+    "supportingEvidence": [
+      {
+        "evidenceId": "attribution-anomaly-key-count-growth-key-count-leak-1-leak-4-b5bb68f4",
+        "kind": "attribution",
+        "statement": "cart:items:* accounts for 100% of the growth by keys stopped expiring."
+      },
+      {
+        "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
+        "kind": "anomaly",
+        "statement": "key-count-growth on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+      },
+      {
+        "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
+        "kind": "ttl-drift",
+        "statement": "cart:items:* TTL coverage moved from 100% to 0% (ttl-removed)."
+      }
+    ],
+    "recommendedActions": [
+      "Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.",
+      "Highest-value finding here. Something stopped setting an expiry on this pattern; nothing will reclaim these keys until it is fixed.",
+      "When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis. Connecting a repo lists Commit candidates for a human look — it does not name a Git Cause."
+    ],
+    "evidenceStrength": "strong",
+    "unknowns": [
+      "No GitHub repository was connected, so Commit candidates in the growth window were not listed."
+    ],
+    "model": null
+  },
+  "graph": {
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t13-00-00-000-6c530308",
+    "builtAt": "2026-08-25T14:00:00.000Z",
+    "window": {
+      "from": "2026-08-25T10:00:00.000Z",
+      "to": "2026-08-25T13:00:00.000Z"
+    },
+    "snapshotIds": [
+      "leak-1",
+      "leak-2",
+      "leak-3",
+      "leak-4"
+    ],
+    "anomalies": [
+      {
+        "eventId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
+        "kind": "key-count-growth",
+        "metric": "key_count",
+        "window": {
+          "from": "2026-08-25T10:00:00.000Z",
+          "to": "2026-08-25T13:00:00.000Z"
+        },
+        "valueBefore": 10000,
+        "valueAfter": 70000,
+        "deltaBytes": null,
+        "snapshotIdBefore": "leak-1",
+        "snapshotIdAfter": "leak-4",
+        "evidenceStrength": "strong",
+        "observations": [
+          "key count moved from 10000 keys to 70000 keys (+600.0%).",
+          "Key count rose faster than used_memory_dataset, so the instance is accumulating keys rather than storing larger values."
+        ]
+      },
+      {
+        "eventId": "anomaly-memory-growth-used-memory-dataset-leak-1-leak-4-777136ec",
+        "kind": "memory-growth",
+        "metric": "used_memory_dataset",
+        "window": {
+          "from": "2026-08-25T10:00:00.000Z",
+          "to": "2026-08-25T13:00:00.000Z"
+        },
+        "valueBefore": 60397978,
+        "valueAfter": 83047219,
+        "deltaBytes": 22649241,
+        "snapshotIdBefore": "leak-1",
+        "snapshotIdAfter": "leak-4",
+        "evidenceStrength": "strong",
+        "observations": [
+          "used_memory_dataset moved from 60397978 bytes to 83047219 bytes (+37.5%).",
+          "key count moved from 10000 keys to 70000 keys (+600.0%).",
+          "used_memory_dataset rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump."
+        ]
+      }
+    ],
+    "attributions": [
+      {
+        "attributionId": "attribution-anomaly-key-count-growth-key-count-leak-1-leak-4-b5bb68f4",
+        "anomalyId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
+        "pattern": "cart:items:*",
+        "mechanism": "keys-not-expiring",
+        "bytesGrowth": 25165824,
+        "keyCountGrowth": 60000,
+        "shareOfAnomalyGrowth": 1,
+        "evidenceStrength": "strong",
+        "supportingSnapshotIds": [
+          "leak-1",
+          "leak-2",
+          "leak-3",
+          "leak-4"
+        ],
+        "observations": [
+          "estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).",
+          "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
+          "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
+          "Accounts for 100.0% of the key_count growth in this window.",
+          "Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern."
+        ]
+      },
+      {
+        "attributionId": "attribution-anomaly-memory-growth-used-memory-dataset-leak-1-92b7a1cc",
+        "anomalyId": "anomaly-memory-growth-used-memory-dataset-leak-1-leak-4-777136ec",
+        "pattern": "cart:items:*",
+        "mechanism": "keys-not-expiring",
+        "bytesGrowth": 25165824,
+        "keyCountGrowth": 60000,
+        "shareOfAnomalyGrowth": 1,
+        "evidenceStrength": "strong",
+        "supportingSnapshotIds": [
+          "leak-1",
+          "leak-2",
+          "leak-3",
+          "leak-4"
+        ],
+        "observations": [
+          "estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).",
+          "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
+          "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
+          "Accounts for 100.0% of the used_memory_dataset growth in this window.",
+          "Corroborated by TTL drift event(s) ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23 on the same pattern."
+        ]
+      }
+    ],
+    "ttlDrift": [
+      {
+        "eventId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
+        "pattern": "cart:items:*",
+        "kind": "ttl-removed",
+        "window": {
+          "from": "2026-08-25T10:00:00.000Z",
+          "to": "2026-08-25T13:00:00.000Z"
+        },
+        "ttlCoverageBefore": 1,
+        "ttlCoverageAfter": 0,
+        "medianTtlSecondsBefore": 3600,
+        "medianTtlSecondsAfter": 3600,
+        "snapshotIdBefore": "leak-1",
+        "snapshotIdAfter": "leak-4",
+        "evidenceStrength": "strong",
+        "observations": [
+          "TTL coverage for cart:items:* moved from 100.0% to 0.0%, measured across 100 sampled keys before and 100 after.",
+          "Keys under cart:items:* carried a TTL and now effectively none do, which is what a SET losing its EX argument or an EXPIRE call being dropped looks like."
+        ]
+      }
+    ],
+    "gaps": [
+      {
+        "kind": "no-repository-connected",
+        "detail": "No GitHub repository was connected, so Commit candidates in the growth window were not listed.",
+        "remedy": "When you have a named Redis Cause, re-run against the same --snapshots directory with --repo owner/repo after installing a GitHub App on the repository that writes that key pattern (contents:read and pull_requests:read). Pick the service repo that owns the pattern, not the repo that merely hosts Redis. Connecting a repo lists Commit candidates for a human look — it does not name a Git Cause."
+      }
+    ]
+  }
+}

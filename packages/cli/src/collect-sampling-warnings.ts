@@ -1,4 +1,4 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 /**
  * Every distinct sampling warning across the snapshots in a diagnosis window, verbatim.

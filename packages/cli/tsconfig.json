@@ -5,13 +5,24 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "references": [
-    { "path": "../core-types" },
-    { "path": "../sampler" },
-    { "path": "../evidence" },
-    { "path": "../github-integration" },
-    { "path": "../reasoner" },
-    { "path": "../alerts" }
+    {
+      "path": "../sampler"
+    },
+    {
+      "path": "../github-integration"
+    },
+    {
+      "path": "../reasoner"
+    },
+    {
+      "path": "../alerts"
+    },
+    {
+      "path": "../core"
+    }
   ]
 }

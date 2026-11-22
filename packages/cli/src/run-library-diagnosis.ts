@@ -4,12 +4,12 @@ import {
   parseRepositoryRef,
 } from '@redis-detective/github-integration';
 import type { GitHubCommitSource, GitHubRepositoryRef } from '@redis-detective/github-integration';
-import type { LlmClient } from '@redis-detective/reasoner';
+import type { LlmClient } from '@redis-detective/core';
 
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
 import { createRedisClient } from './create-redis-client.js';
-import type { DiagnosisJson } from './diagnosis-json.js';
-import { toDiagnosisJson } from './diagnosis-json.js';
+import type { DiagnosisJson } from '@redis-detective/core';
+import { toDiagnosisJson } from '@redis-detective/core';
 import type { DiagnosisOptions } from './diagnosis-options.js';
 import type { LibraryEngineDeps } from './library-engine-deps.js';
 import type { LibraryLlmOptions } from './library-llm-options.js';

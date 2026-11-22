@@ -1,7 +1,7 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 import type { HealthCheckReport, HealthFinding } from './health-check-report.js';
-import { serializeSnapshot } from './serialize-snapshot.js';
+import { serializeSnapshot } from '@redis-detective/core';
 
 /** Bump on any breaking change to the JSON shape; consumers key off this. */
 export const JSON_REPORT_SCHEMA_VERSION = 1;

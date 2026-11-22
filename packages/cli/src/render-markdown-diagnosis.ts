@@ -5,11 +5,11 @@ import type {
   RedisSnapshot,
   TemporalRelation,
   TTLDriftEvent,
-} from '@redis-detective/core-types';
+} from '@redis-detective/core';
 
 import { collectSamplingWarnings } from './collect-sampling-warnings.js';
-import type { DiagnosisReport } from './diagnosis-report.js';
-import type { CiGateResult } from './evaluate-ci-gate.js';
+import type { DiagnosisReport } from '@redis-detective/core';
+import type { CiGateResult } from '@redis-detective/core';
 import { EVIDENCE_VOCABULARY, STRENGTH_LABEL } from './evidence-vocabulary.js';
 import {
   formatCiGateFindingDetail,

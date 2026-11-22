@@ -1,4 +1,4 @@
-import type { EvidenceStrength, RedisSnapshot } from '@redis-detective/core-types';
+import type { EvidenceStrength, RedisSnapshot } from '@redis-detective/core';
 
 export const HEALTH_FINDING_KINDS = [
   /** A pattern is a large share of estimated memory. */

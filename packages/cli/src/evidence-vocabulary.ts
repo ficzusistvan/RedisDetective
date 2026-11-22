@@ -4,7 +4,7 @@ import type {
   EvidenceStrength,
   GrowthMechanism,
   TtlDriftKind,
-} from '@redis-detective/core-types';
+} from '@redis-detective/core';
 
 export interface EvidencePhrase {
   /** Short label for a report heading or list item. */

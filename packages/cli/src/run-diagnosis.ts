@@ -1,5 +1,11 @@
-import { buildEvidenceGraph } from '@redis-detective/evidence';
-import type { EvidenceOptions } from '@redis-detective/evidence';
+import {
+  buildEvidenceGraph,
+  explainEvidence,
+  shouldNudgeRepositoryConnection,
+  withGitHubUnavailableGap,
+  withNoRepositoryGap,
+} from '@redis-detective/core';
+import type { DiagnosisReport, EvidenceOptions, LlmClient } from '@redis-detective/core';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
@@ -10,8 +16,6 @@ import {
   formatRepositoryRef,
 } from '@redis-detective/github-integration';
 import type { GitHubCommitSource, GitHubRepositoryRef } from '@redis-detective/github-integration';
-import { explainEvidence } from '@redis-detective/reasoner';
-import type { LlmClient } from '@redis-detective/reasoner';
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
 import { captureSnapshot } from './capture-snapshot.js';
@@ -19,12 +23,8 @@ import {
   DEFAULT_COMMIT_LOOKBACK_HOURS,
   DEFAULT_MAX_COMMIT_CANDIDATES,
 } from './commit-lookup-defaults.js';
-import type { DiagnosisReport } from './diagnosis-report.js';
 import { patternHintsFromGraph } from './pattern-hints-from-graph.js';
 import type { SnapshotStore } from './snapshot-store.js';
-import { withGitHubUnavailableGap } from './with-github-unavailable-gap.js';
-import { withNoRepositoryGap } from './with-no-repository-gap.js';
-import { shouldNudgeRepositoryConnection } from './should-nudge-repository-connection.js';
 
 export interface RunDiagnosisRequest {
   readonly store: SnapshotStore;

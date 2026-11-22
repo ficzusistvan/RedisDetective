@@ -1,12 +1,29 @@
 {
   "files": [],
   "references": [
-    { "path": "./packages/core-types" },
-    { "path": "./packages/sampler" },
-    { "path": "./packages/evidence" },
-    { "path": "./packages/github-integration" },
-    { "path": "./packages/reasoner" },
-    { "path": "./packages/alerts" },
-    { "path": "./packages/cli" }
+    {
+      "path": "./packages/core-types"
+    },
+    {
+      "path": "./packages/sampler"
+    },
+    {
+      "path": "./packages/evidence"
+    },
+    {
+      "path": "./packages/github-integration"
+    },
+    {
+      "path": "./packages/reasoner"
+    },
+    {
+      "path": "./packages/alerts"
+    },
+    {
+      "path": "./packages/core"
+    },
+    {
+      "path": "./packages/cli"
+    }
   ]
 }

@@ -35,7 +35,7 @@ export type { RedisConnection } from './create-redis-client.js';
 export { HEALTH_FINDING_KINDS } from './health-check-report.js';
 export type { HealthCheckReport, HealthFinding, HealthFindingKind } from './health-check-report.js';
 
-export type { DiagnosisReport } from './diagnosis-report.js';
+export type { DiagnosisReport } from '@redis-detective/core';
 
 export {
   DEFAULT_COMMIT_LOOKBACK_HOURS,
@@ -43,9 +43,9 @@ export {
 } from './commit-lookup-defaults.js';
 
 export { patternHintsFromGraph } from './pattern-hints-from-graph.js';
-export { withNoRepositoryGap } from './with-no-repository-gap.js';
-export { withGitHubUnavailableGap } from './with-github-unavailable-gap.js';
-export { shouldNudgeRepositoryConnection } from './should-nudge-repository-connection.js';
+export { withNoRepositoryGap } from '@redis-detective/core';
+export { withGitHubUnavailableGap } from '@redis-detective/core';
+export { shouldNudgeRepositoryConnection } from '@redis-detective/core';
 export {
   createGitHubCommitSource,
   resolvePersonalGitHubToken,
@@ -62,8 +62,8 @@ export { createLlmClientFromEnv } from './create-llm-client-from-env.js';
 export { EVIDENCE_VOCABULARY, STRENGTH_LABEL } from './evidence-vocabulary.js';
 export type { EvidencePhrase } from './evidence-vocabulary.js';
 
-export { SNAPSHOT_FILE_SCHEMA_VERSION, parseStoredSnapshot } from './parse-stored-snapshot.js';
-export { StoredSnapshotError } from './stored-snapshot-error.js';
+export { SNAPSHOT_FILE_SCHEMA_VERSION, parseStoredSnapshot } from '@redis-detective/core';
+export { StoredSnapshotError } from '@redis-detective/core';
 
 export {
   createFileSnapshotStore,
@@ -74,12 +74,12 @@ export type { SnapshotStore, StoredSnapshot } from './snapshot-store.js';
 
 export { collectSamplingWarnings } from './collect-sampling-warnings.js';
 
-export { serializeSnapshot } from './serialize-snapshot.js';
+export { serializeSnapshot } from '@redis-detective/core';
 export { captureSnapshot, samplerOptionsFromCli } from './capture-snapshot.js';
 export type { CaptureSnapshotRequest } from './capture-snapshot.js';
 
-export { gradeFindingStrength, measuredFindingStrength } from './grade-finding-strength.js';
-export type { FindingStrengthInput } from './grade-finding-strength.js';
+export { gradeFindingStrength, measuredFindingStrength } from '@redis-detective/core';
+export type { FindingStrengthInput } from '@redis-detective/core';
 
 export { HEALTH_CHECK_THRESHOLDS, deriveHealthFindings } from './derive-health-findings.js';
 
@@ -92,7 +92,7 @@ export type { RunDiagnosisRequest } from './run-diagnosis.js';
 export { toHealthCheckJson } from './health-check-json.js';
 export type { HealthCheckJson, HealthCheckJsonFinding } from './health-check-json.js';
 
-export { toDiagnosisJson } from './diagnosis-json.js';
+export { toDiagnosisJson } from '@redis-detective/core';
 export type {
   DiagnosisJson,
   DiagnosisJsonAnomaly,
@@ -101,7 +101,7 @@ export type {
   DiagnosisJsonExplanation,
   DiagnosisJsonGraph,
   DiagnosisJsonTtlDrift,
-} from './diagnosis-json.js';
+} from '@redis-detective/core';
 
 export { runLibraryHealthCheck } from './run-library-health-check.js';
 export type {
@@ -199,7 +199,7 @@ export {
   emptyCiGateThresholds,
   evaluateCiGate,
   hasCiGateThresholds,
-} from './evaluate-ci-gate.js';
+} from '@redis-detective/core';
 export type {
   CiGateFinding,
   CiGateFindingKind,
@@ -207,8 +207,8 @@ export type {
   CiGateResult,
   CiGateThresholds,
   EvaluateCiGateRequest,
-} from './evaluate-ci-gate.js';
-export { serializeCiGate } from './serialize-ci-gate.js';
+} from '@redis-detective/core';
+export { serializeCiGate } from '@redis-detective/core';
 export {
   formatCiGateFindingDetail,
   formatCiGateFindingRule,

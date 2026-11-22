@@ -1,4 +1,4 @@
-import type { CiGateFinding, CiGateOutcome, CiGateResult } from './evaluate-ci-gate.js';
+import type { CiGateFinding, CiGateOutcome, CiGateResult } from '@redis-detective/core';
 import { formatCount, formatEstimatedBytes, formatPercent } from './format-bytes.js';
 
 export function formatCiGateOutcome(gate: CiGateResult): string {

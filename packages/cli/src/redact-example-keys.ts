@@ -1,4 +1,4 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 export const REDACTED_KEY = '<redacted>';
 

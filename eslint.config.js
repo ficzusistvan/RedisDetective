@@ -84,6 +84,103 @@ export default tseslint.config(
     },
   },
 
+  // HARD RULE: packages/core is pure analysis — no I/O, no clock, no Redis/GitHub/alerts.
+  {
+    files: ['packages/core/src/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            LLM_RESTRICTION,
+            {
+              group: ['node:*'],
+              message:
+                'packages/core must stay side-effect-free: no node:* imports. Pass timestamps and paths in as arguments.',
+            },
+            {
+              group: ['redis', 'redis/*'],
+              message: 'packages/core must not open Redis. Accept RedisSnapshot values only.',
+            },
+          ],
+          paths: [
+            ...networkRestrictions('packages/core must be pure and offline.'),
+            {
+              name: '@redis-detective/sampler',
+              message: 'packages/core must not sample Redis. Accept RedisSnapshot values only.',
+            },
+            {
+              name: '@redis-detective/github-integration',
+              message:
+                'packages/core must not call GitHub. Commit candidates are assembled by the CLI or web runner.',
+            },
+            {
+              name: '@redis-detective/alerts',
+              message: 'packages/core is analysis only; alerts belong in the CLI.',
+            },
+          ],
+        },
+      ],
+      'no-restricted-globals': [
+        'error',
+        { name: 'fetch', message: 'packages/core must be pure and offline.' },
+      ],
+      'no-restricted-properties': [
+        'error',
+        {
+          object: 'Math',
+          property: 'random',
+          message: 'packages/core must be deterministic.',
+        },
+        {
+          object: 'Date',
+          property: 'now',
+          message: 'packages/core must be deterministic: pass generatedAt / builtAt as arguments.',
+        },
+        {
+          object: 'process',
+          property: 'env',
+          message: 'packages/core must not read process.env; callers inject configuration.',
+        },
+      ],
+    },
+  },
+
+  // HARD RULE: CLI analysis goes through @redis-detective/core, not private packages.
+  {
+    files: ['packages/cli/src/**/*.ts'],
+    ignores: [
+      // LLM client construction is a CLI concern; the reasoner owns the SDK, core only accepts LlmClient.
+      'packages/cli/src/create-llm-client-from-env.ts',
+      'packages/cli/src/library-llm-options.ts',
+      'packages/cli/src/library-engine-deps.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [LLM_RESTRICTION],
+          paths: [
+            {
+              name: '@redis-detective/core-types',
+              message:
+                'Import analysis types from @redis-detective/core, not @redis-detective/core-types.',
+            },
+            {
+              name: '@redis-detective/evidence',
+              message: 'Import analysis from @redis-detective/core, not @redis-detective/evidence.',
+            },
+            {
+              name: '@redis-detective/reasoner',
+              message:
+                'Import explainEvidence / LlmClient from @redis-detective/core. Construct provider clients only in the allowlisted LLM wiring files.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // HARD RULE: evidence/ is pure, deterministic and offline.
   {
     files: ['packages/evidence/src/**/*.ts'],

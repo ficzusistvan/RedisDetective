@@ -1,8 +1,8 @@
-import { toDiagnosisJson } from './diagnosis-json.js';
-import type { DiagnosisReport } from './diagnosis-report.js';
-import type { CiGateResult } from './evaluate-ci-gate.js';
+import { toDiagnosisJson } from '@redis-detective/core';
+import type { DiagnosisReport } from '@redis-detective/core';
+import type { CiGateResult } from '@redis-detective/core';
 
-export { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from './diagnosis-json.js';
+export { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from '@redis-detective/core';
 
 /**
  * Renders a diagnosis as JSON for `--json`.

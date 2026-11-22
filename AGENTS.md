@@ -12,14 +12,17 @@ output is a plain-language explanation an on-call engineer can act on, not a das
 
 **MVP scope is exactly that one question.** Anything else is out of scope for now. Latency
 root-cause, eviction root-cause, cost/billing correlation, multi-cloud support and hosted
-alerting SaaS (email, Teams, Opsgenie, a dashboard) are explicitly _not_ being built yet — see
+alerting SaaS (email, Teams, Opsgenie) are explicitly _not_ being built yet — see
 [`docs/mvp-scope.md`](docs/mvp-scope.md). Local `watch` notifications (Slack, generic webhook,
-PagerDuty) reuse the CI-gate thresholds; see [`docs/alerts.md`](docs/alerts.md). If a change only
+PagerDuty) reuse the CI-gate thresholds; see [`docs/alerts.md`](docs/alerts.md). A hosted
+dashboard exists in the separate private repo `redis-detective-web`; this repo stays CLI +
+`@redis-detective/core` only, and web-specific code does not belong here. If a change only
 makes sense for an out-of-scope item, it does not belong in this repo yet.
 
 Phase 1 ships as a standalone read-only CLI (`packages/cli`, "Redis Memory Health Check") that
-works against any Redis URL with no signup. GitHub is optional (`--repo`); when connected it lists
-commit candidates only — never Causes.
+works against any Redis URL with no signup, plus a public analysis library
+(`@redis-detective/core`) the CLI and the web runner share. GitHub is optional (`--repo`); when
+connected it lists commit candidates only — never Causes.
 
 ---
 
@@ -112,8 +115,14 @@ conclusion_, not about reporting observations.
   `Math.random()`, no ambient state. Timestamps and thresholds arrive as arguments. The same
   snapshots must always produce the same `EvidenceGraph` — that determinism is what makes the
   product debuggable.
+- **`packages/core` is pure analysis.** No `node:*`, no `fetch`, no `process.env`, no
+  `Date.now()` / `Math.random()`, no `redis` / sampler / github-integration / alerts. The caller
+  passes `generatedAt` in. ESLint enforces this. Core depends on `core-types`, `evidence`, and
+  `reasoner` via `workspace:*`; its published build bundles them.
 - **Dependencies point inwards.** Everything may depend on `core-types`. `evidence` depends only
-  on `core-types`. `cli` composes; nothing depends on `cli`.
+  on `core-types`. Dependency direction for analysis is `cli` → `core` → `{core-types, evidence,
+  reasoner}`. The CLI must import analysis from `@redis-detective/core`, not from `evidence`,
+  `reasoner`, or `core-types` directly. Nothing depends on `cli`.
 - **Inject collaborators.** Redis clients, GitHub clients and LLM clients are narrow interfaces
   passed in as arguments (`RedisCommandClient`, `GitHubCommitSource`, `LlmClient`), never
   constructed inside the function that uses them. This is what makes the no-network test rule
@@ -149,7 +158,9 @@ the hard rules above, and a failure there is an architecture violation rather th
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `no-restricted-imports` (all packages but `reasoner`)          | Importing an LLM SDK outside the reasoner.                                                              |
 | `no-restricted-imports` / `no-restricted-globals` (`reasoner`) | The reasoner importing `sampler`, `github-integration`, an HTTP client, or using `fetch`.               |
-| `no-restricted-properties` (`evidence`)                        | `Date.now()` or `Math.random()` breaking determinism.                                                   |
+| `no-restricted-properties` (`evidence`, `core`)                | `Date.now()` or `Math.random()` breaking determinism.                                                   |
+| `no-restricted-imports` (`core`)                               | `node:*`, `fetch`, redis/sampler/github/alerts — core stays side-effect-free.                           |
+| `no-restricted-imports` (`cli`)                                | Importing `evidence` / `reasoner` / `core-types` instead of `@redis-detective/core`.                    |
 | `no-restricted-syntax` (`sampler`)                             | Calling `KEYS`/`FLUSHDB`/`EVAL`, or widening the client interface with an unbounded or generic command. |
 | `@typescript-eslint/no-explicit-any`                           | `any` anywhere.                                                                                         |
 
@@ -166,19 +177,22 @@ pnpm build       # tsc -b across all packages
 pnpm typecheck   # build + typecheck tests
 pnpm test        # vitest in every package
 pnpm lint        # eslint, including the architectural restriction rules
+pnpm pack:core   # bundle @redis-detective/core for npm (requires a prior build)
 pnpm pack:cli    # bundle the CLI for npm (requires a prior build)
-pnpm verify      # lint + typecheck + test + pack:cli
+pnpm verify      # lint + typecheck + test + pack:core + pack:cli
 pnpm health-check -- --url redis://localhost:6379
 ```
 
-The public npm package is `redis-detective`, staged by `pnpm pack:cli` into `packages/cli/publish`.
-The tarball includes the CLI (`bin.js`) and a programmatic API (`index.js` + `index.d.ts`).
-Internal `@redis-detective/*` packages stay private and are bundled into that tarball. The GitHub
-repo may stay private; provenance is omitted in that case. Do not `npm publish` the workspace CLI
-package.
+Public npm packages: `redis-detective` (CLI + programmatic sampling API) via `pnpm pack:cli` into
+`packages/cli/publish`, and `@redis-detective/core` (side-effect-free analysis) via
+`pnpm pack:core` into `packages/core/publish`. The CLI tarball still depends only on `redis`;
+core is bundled into `bin.js` / `index.js`. Core’s published build has no dependencies and ships
+golden fixtures plus `snapshot-file.schema.json`. Internal `@redis-detective/*` packages stay
+private. The GitHub repo may stay private; provenance is omitted in that case. Do not
+`npm publish` the workspace CLI or core packages directly.
 
-From a clone, `pnpm health-check` runs the built CLI. `pnpm pack:cli` is the dry-run of what npm
-gets. No unit test in this repo touches the network.
+From a clone, `pnpm health-check` runs the built CLI. `pnpm pack:cli` / `pnpm pack:core` are the
+dry-runs of what npm gets. No unit test in this repo touches the network.
 
 A disposable instance with a planted TTL leak:
 
@@ -193,26 +207,30 @@ between real snapshots.
 
 ### Releasing
 
-The npm package is public; this repo can stay private.
+The npm packages are public; this repo can stay private.
 
-1. Bump `version` in `packages/cli/package.json` (and the repo root, to match).
-2. GitHub Actions secret `NPM_TOKEN` must be able to publish `redis-detective`.
-3. Push a tag `v<that version>` from `main` (`git tag v0.1.0 && git push origin v0.1.0`).
+1. Bump `version` in `packages/cli/package.json` and `packages/core/package.json` (and the repo
+   root) so all three match.
+2. GitHub Actions secret `NPM_TOKEN` must be able to publish `redis-detective` and
+   `@redis-detective/core`.
+3. Push a tag `v<that version>` from `main` (`git tag v0.6.0 && git push origin v0.6.0`).
 
-The release workflow runs `pnpm verify`, checks that the tag matches the CLI version, and publishes
-`packages/cli/publish`. npm provenance is attached only if the source repository is public.
+The release workflow runs `pnpm verify`, checks that the tag matches both package versions,
+publishes `packages/core/publish` first, then `packages/cli/publish`. npm provenance is attached
+only if the source repository is public.
 
 The README is what npm users see. Keep it operator-facing; contributor and release notes live here.
 
 ## Current state
 
-Health check, sampler, evidence, CLI diagnosis, GitHub candidate lookup, the reasoner
-(deterministic paragraph, optional LLM wording behind the validator), and a programmatic library
-API on the published `redis-detective` package are implemented. The `watch`
-subcommand runs the diagnosis path on an interval into a local snapshot directory, with no commit
-lookup and no model call per tick. When thresholds and a channel are configured it reuses the CI
-gate comparison and notifies Slack, a generic webhook, or PagerDuty (`packages/alerts`) without
-spamming: firing → resolved, cooldown, persisted state. `test-alert` / `alerts test` sends one
-sample per channel. `push` uploads snapshots not yet accepted by that web instance, in batches
-under 4 MiB; `watch --push` uploads the snapshot it just took and keeps sampling if the upload
-fails. Both use an instance push token. See `docs/alerts.md` and `docs/mvp-scope.md`.
+Health check, sampler, evidence, `@redis-detective/core` (shared analysis + golden fixtures), CLI
+diagnosis, GitHub candidate lookup, the reasoner (deterministic paragraph, optional LLM wording
+behind the validator), and a programmatic library API on the published `redis-detective` package
+are implemented. The `watch` subcommand runs the diagnosis path on an interval into a local
+snapshot directory, with no commit lookup and no model call per tick. When thresholds and a
+channel are configured it reuses the CI gate comparison and notifies Slack, a generic webhook, or
+PagerDuty (`packages/alerts`) without spamming: firing → resolved, cooldown, persisted state.
+`test-alert` / `alerts test` sends one sample per channel. `push` uploads snapshots not yet
+accepted by that web instance, in batches under 4 MiB; `watch --push` uploads the snapshot it just
+took and keeps sampling if the upload fails. Both use an instance push token. See `docs/alerts.md`
+and `docs/mvp-scope.md`.

@@ -1,11 +1,16 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import {
+  SNAPSHOT_FILE_SCHEMA_VERSION,
+  StoredSnapshotError,
+  parseStoredSnapshot,
+  serializeSnapshot,
+  snapshotFileName,
+} from '@redis-detective/core';
+import type { RedisSnapshot } from '@redis-detective/core';
 
-import { SNAPSHOT_FILE_SCHEMA_VERSION, parseStoredSnapshot } from './parse-stored-snapshot.js';
-import { StoredSnapshotError } from './stored-snapshot-error.js';
-import { serializeSnapshot } from './serialize-snapshot.js';
+export { snapshotFileName } from '@redis-detective/core';
 
 export interface StoredSnapshot {
   /** Where this came from, so an error or a report can point at it. */
@@ -29,19 +34,6 @@ export interface SnapshotStore {
 }
 
 const FILE_SUFFIX = '.snapshot.json';
-
-/**
- * A filename that sorts chronologically and stays legible in a directory listing.
- *
- * The timestamp leads so that `ls` shows the series in order. Colons and dots are replaced because
- * they are not legal in filenames on Windows, and a snapshot directory is the sort of thing people
- * put in a shared repository.
- */
-export function snapshotFileName(snapshot: RedisSnapshot): string {
-  const stamp = snapshot.capturedAt.replace(/[:.]/g, '-');
-  const id = snapshot.snapshotId.replace(/[^A-Za-z0-9_-]/g, '-');
-  return `${stamp}--${id}${FILE_SUFFIX}`;
-}
 
 /**
  * A snapshot store backed by a directory of JSON files.

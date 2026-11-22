@@ -1,4 +1,4 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 import type { LibrarySamplingOptions } from './library-sampling-options.js';
 

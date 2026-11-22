@@ -7,7 +7,7 @@ import {
   renderTextReport,
 } from '@redis-detective/cli';
 import type { HealthCheckReport } from '@redis-detective/cli';
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 import { patternFixture, samplingFixture, snapshotFixture } from './helpers/snapshot-builder.js';
 

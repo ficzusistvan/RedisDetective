@@ -1,4 +1,4 @@
-import type { KeyPatternStats, RedisSnapshot } from '@redis-detective/core-types';
+import type { KeyPatternStats, RedisSnapshot } from '@redis-detective/core';
 
 import type { HealthFinding } from './health-check-report.js';
 import {
@@ -8,7 +8,7 @@ import {
   formatEstimatedBytes,
   formatPercent,
 } from './format-bytes.js';
-import { gradeFindingStrength, measuredFindingStrength } from './grade-finding-strength.js';
+import { gradeFindingStrength, measuredFindingStrength } from '@redis-detective/core';
 
 export const HEALTH_CHECK_THRESHOLDS = {
   /** Share of estimated data a pattern must hold before it is worth naming. */

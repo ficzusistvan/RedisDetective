@@ -1,7 +1,7 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
-import { SNAPSHOT_FILE_SCHEMA_VERSION } from './parse-stored-snapshot.js';
-import { serializeSnapshot } from './serialize-snapshot.js';
+import { SNAPSHOT_FILE_SCHEMA_VERSION } from '@redis-detective/core';
+import { serializeSnapshot } from '@redis-detective/core';
 import { snapshotFileName } from './snapshot-store.js';
 import type { SnapshotStore, StoredSnapshot } from './snapshot-store.js';
 

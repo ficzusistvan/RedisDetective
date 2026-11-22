@@ -21,6 +21,7 @@ export default defineConfig({
       '@redis-detective/github-integration': packageEntry('github-integration'),
       '@redis-detective/reasoner': packageEntry('reasoner'),
       '@redis-detective/alerts': packageEntry('alerts'),
+      '@redis-detective/core': packageEntry('core'),
       '@redis-detective/cli': packageEntry('cli'),
       // Consumer specifier for the published API (packages/cli/src/api.ts).
       'redis-detective': packageEntry('cli', 'api'),

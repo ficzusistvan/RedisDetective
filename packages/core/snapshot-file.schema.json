@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://redis-detective.dev/schemas/snapshot-file.v1.json",
+  "title": "Redis Detective snapshot file (schemaVersion 1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "snapshot"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1
+    },
+    "snapshot": {
+      "$ref": "#/$defs/redisSnapshot"
+    }
+  },
+  "$defs": {
+    "redisSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshotId",
+        "capturedAt",
+        "instance",
+        "memory",
+        "keyspace",
+        "patterns",
+        "sampling"
+      ],
+      "properties": {
+        "snapshotId": { "type": "string", "minLength": 1 },
+        "capturedAt": { "type": "string", "minLength": 1 },
+        "instance": { "$ref": "#/$defs/instance" },
+        "memory": { "$ref": "#/$defs/memory" },
+        "keyspace": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/keyspaceEntry" }
+        },
+        "patterns": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pattern" }
+        },
+        "sampling": { "$ref": "#/$defs/sampling" }
+      }
+    },
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "redisVersion",
+        "mode",
+        "role",
+        "maxmemoryBytes",
+        "maxmemoryPolicy",
+        "uptimeSeconds"
+      ],
+      "properties": {
+        "redisVersion": { "type": "string" },
+        "mode": {
+          "type": "string",
+          "enum": ["standalone", "cluster", "sentinel", "unknown"]
+        },
+        "role": {
+          "type": "string",
+          "enum": ["master", "replica", "unknown"]
+        },
+        "maxmemoryBytes": { "type": ["number", "null"] },
+        "maxmemoryPolicy": { "type": "string" },
+        "uptimeSeconds": { "type": "number" }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "usedMemoryBytes",
+        "usedMemoryRssBytes",
+        "usedMemoryDatasetBytes",
+        "usedMemoryPeakBytes",
+        "memFragmentationRatio",
+        "evictedKeys",
+        "expiredKeys"
+      ],
+      "properties": {
+        "usedMemoryBytes": { "type": ["number", "null"] },
+        "usedMemoryRssBytes": { "type": ["number", "null"] },
+        "usedMemoryDatasetBytes": { "type": ["number", "null"] },
+        "usedMemoryPeakBytes": { "type": ["number", "null"] },
+        "memFragmentationRatio": { "type": "number" },
+        "evictedKeys": { "type": "number" },
+        "expiredKeys": { "type": "number" }
+      }
+    },
+    "keyspaceEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["db", "keyCount", "keysWithExpiry", "averageTtlMs"],
+      "properties": {
+        "db": { "type": "number" },
+        "keyCount": { "type": "number" },
+        "keysWithExpiry": { "type": "number" },
+        "averageTtlMs": { "type": ["number", "null"] }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern",
+        "dataType",
+        "sampledKeyCount",
+        "sampledBytes",
+        "estimatedKeyCount",
+        "estimatedBytes",
+        "bytesMeasured",
+        "keysWithTtl",
+        "keysWithoutTtl",
+        "medianTtlSeconds",
+        "exampleKeys",
+        "estimateBasis"
+      ],
+      "properties": {
+        "pattern": { "type": "string" },
+        "dataType": {
+          "type": "string",
+          "enum": ["string", "list", "set", "zset", "hash", "stream", "unknown"]
+        },
+        "sampledKeyCount": { "type": "number" },
+        "sampledBytes": { "type": "number" },
+        "estimatedKeyCount": { "type": "number" },
+        "estimatedBytes": { "type": "number" },
+        "bytesMeasured": { "type": "boolean" },
+        "keysWithTtl": { "type": "number" },
+        "keysWithoutTtl": { "type": "number" },
+        "medianTtlSeconds": { "type": ["number", "null"] },
+        "exampleKeys": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "estimateBasis": {
+          "type": "string",
+          "enum": ["sampled-extrapolation", "exact"]
+        }
+      }
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "requestedSampleSize",
+        "observedSampleSize",
+        "scanPasses",
+        "effectiveSampleRate",
+        "durationMs",
+        "truncated",
+        "warnings"
+      ],
+      "properties": {
+        "strategy": { "type": "string", "const": "randomized-scan" },
+        "requestedSampleSize": { "type": "number" },
+        "observedSampleSize": { "type": "number" },
+        "scanPasses": { "type": "number" },
+        "effectiveSampleRate": { "type": "number" },
+        "durationMs": { "type": "number" },
+        "truncated": { "type": "boolean" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

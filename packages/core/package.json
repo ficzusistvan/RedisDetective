@@ -1,0 +1,42 @@
+{
+  "name": "@redis-detective/core",
+  "version": "0.6.0",
+  "license": "FSL-1.1-Apache-2.0",
+  "private": true,
+  "description": "Side-effect-free Redis memory growth analysis: snapshots, evidence graph, diagnosis JSON.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./snapshot-file.schema.json": "./snapshot-file.schema.json"
+  },
+  "files": [
+    "dist",
+    "fixtures",
+    "snapshot-file.schema.json",
+    "SNAPSHOT_FORMAT.md"
+  ],
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run",
+    "lint": "eslint src test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@redis-detective/core-types": "workspace:*",
+    "@redis-detective/evidence": "workspace:*",
+    "@redis-detective/reasoner": "workspace:*"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0"
+  }
+}

@@ -2,7 +2,7 @@ import { captureSnapshot } from './capture-snapshot.js';
 import type { LibraryEngineDeps } from './library-engine-deps.js';
 import { capturedSamplingFields } from './library-sampling-options.js';
 import type { SaveSnapshotOptions, SavedSnapshot } from './save-snapshot-options.js';
-import { serializeSnapshot } from './serialize-snapshot.js';
+import { serializeSnapshot } from '@redis-detective/core';
 import { createFileSnapshotStore } from './snapshot-store.js';
 import { withRedisConnection } from './with-redis-connection.js';
 

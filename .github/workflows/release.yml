@@ -29,13 +29,30 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: pnpm install --frozen-lockfile
       - run: pnpm verify
-      - name: Check git tag matches the CLI version
+      - name: Check git tag matches CLI and core versions
         run: |
           tag="${GITHUB_REF_NAME#v}"
-          version="$(node -p "require('./packages/cli/package.json').version")"
-          if [ "$tag" != "$version" ]; then
-            echo "Tag v${tag} does not match packages/cli version ${version}."
+          cli_version="$(node -p "require('./packages/cli/package.json').version")"
+          core_version="$(node -p "require('./packages/core/package.json').version")"
+          if [ "$tag" != "$cli_version" ]; then
+            echo "Tag v${tag} does not match packages/cli version ${cli_version}."
             exit 1
+          fi
+          if [ "$tag" != "$core_version" ]; then
+            echo "Tag v${tag} does not match packages/core version ${core_version}."
+            exit 1
+          fi
+      - name: Publish @redis-detective/core to npm
+        working-directory: packages/core/publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          SOURCE_IS_PUBLIC: ${{ github.event.repository.visibility == 'public' }}
+        run: |
+          if [ "$SOURCE_IS_PUBLIC" = "true" ]; then
+            npm publish --access public --provenance
+          else
+            echo "Skipping npm provenance: source repository is not public."
+            npm publish --access public
           fi
       - name: Publish redis-detective to npm
         working-directory: packages/cli/publish

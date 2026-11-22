@@ -1,4 +1,4 @@
-import type { EvidenceGraph } from '@redis-detective/core-types';
+import type { EvidenceGraph } from '@redis-detective/core';
 
 /**
  * Turns evidence patterns (`session:*`) into the prefixes GitHub lookup searches for (`session:`).

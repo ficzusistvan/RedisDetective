@@ -10,6 +10,7 @@ import type {
   SamplingMetadata,
 } from '@redis-detective/core-types';
 
+import { SNAPSHOT_FILE_MIGRATIONS } from './snapshot-file-migrations.js';
 import { StoredSnapshotError } from './stored-snapshot-error.js';
 
 export { StoredSnapshotError } from './stored-snapshot-error.js';
@@ -19,9 +20,15 @@ export { StoredSnapshotError } from './stored-snapshot-error.js';
  *
  * Snapshots are written by one run and read by another, potentially weeks and one `git pull` apart.
  * Without a version, an old file silently missing a field the detectors now read would produce a
- * confident diagnosis from partial data.
+ * confident diagnosis from partial data. See SNAPSHOT_FORMAT.md for when to bump.
  */
 export const SNAPSHOT_FILE_SCHEMA_VERSION = 1;
+
+/**
+ * Every schema version this build can read, including ones that must be migrated up to
+ * `SNAPSHOT_FILE_SCHEMA_VERSION` before the body is parsed.
+ */
+export const SUPPORTED_SNAPSHOT_FILE_SCHEMA_VERSIONS: readonly number[] = [1];
 
 const DEPLOYMENT_MODES: readonly RedisDeploymentMode[] = [
   'standalone',
@@ -160,15 +167,51 @@ function parseSampling(value: unknown, path: string): SamplingMetadata {
  * `location` appears in every message, because the useful response to a bad file is to go and look
  * at it.
  */
-export function parseStoredSnapshot(contents: unknown, location: string): RedisSnapshot {
-  const file = record(contents, location);
-
+function migrateToCurrent(file: Record<string, unknown>, location: string): Record<string, unknown> {
   const version = file['schemaVersion'];
-  if (version !== SNAPSHOT_FILE_SCHEMA_VERSION) {
+
+  if (typeof version !== 'number' || !Number.isInteger(version)) {
     throw new StoredSnapshotError(
       `${location} has schemaVersion ${JSON.stringify(version)}, but this build reads version ${SNAPSHOT_FILE_SCHEMA_VERSION}. Delete the file and take a fresh snapshot.`,
     );
   }
+
+  if (version > SNAPSHOT_FILE_SCHEMA_VERSION) {
+    throw new StoredSnapshotError(
+      `${location} has schemaVersion ${String(version)}, written by a newer redis-detective than this build (which reads up to version ${SNAPSHOT_FILE_SCHEMA_VERSION}). Upgrade redis-detective, or delete the file and take a fresh snapshot.`,
+    );
+  }
+
+  if (!SUPPORTED_SNAPSHOT_FILE_SCHEMA_VERSIONS.includes(version)) {
+    throw new StoredSnapshotError(
+      `${location} has schemaVersion ${String(version)}, but this build reads version ${SNAPSHOT_FILE_SCHEMA_VERSION}. Delete the file and take a fresh snapshot.`,
+    );
+  }
+
+  let current: Record<string, unknown> = file;
+  let at = version;
+  while (at < SNAPSHOT_FILE_SCHEMA_VERSION) {
+    const migrate = SNAPSHOT_FILE_MIGRATIONS[at];
+    if (migrate === undefined) {
+      throw new StoredSnapshotError(
+        `${location} has schemaVersion ${String(at)}, but this build has no migration to version ${SNAPSHOT_FILE_SCHEMA_VERSION}. Delete the file and take a fresh snapshot.`,
+      );
+    }
+    current = migrate(current);
+    const next = current['schemaVersion'];
+    if (typeof next !== 'number' || !Number.isInteger(next) || next <= at) {
+      throw new StoredSnapshotError(
+        `${location} migration from schemaVersion ${String(at)} did not advance the version.`,
+      );
+    }
+    at = next;
+  }
+
+  return current;
+}
+
+export function parseStoredSnapshot(contents: unknown, location: string): RedisSnapshot {
+  const file = migrateToCurrent(record(contents, location), location);
 
   const path = `${location}.snapshot`;
   const raw = record(file['snapshot'], path);

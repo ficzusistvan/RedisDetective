@@ -22,7 +22,15 @@ function sideEffectImportPattern() {
   return /^import\s+['"]([^'"]+)['"];?\s*$/gm;
 }
 
-export function bundleLibraryDts(entryPath) {
+/**
+ * @param {string} entryPath
+ * @param {{ preserveAllExports?: boolean }} [options]
+ *   When `preserveAllExports` is true (pure re-export barrels such as `@redis-detective/core`),
+ *   inlined declarations keep their `export` keywords so the result is a module. The CLI API
+ *   entry is not a barrel — it keeps the default demotion so only the entry's exports are public.
+ */
+export function bundleLibraryDts(entryPath, options = {}) {
+  const preserveAllExports = options.preserveAllExports === true;
   const visited = new Set();
   const pieces = [];
 
@@ -66,32 +74,42 @@ export function bundleLibraryDts(entryPath) {
 
   const entryResolved = resolveExisting(entryPath);
   const bundled = pieces
-    .map(({ filePath, text }) => (filePath === entryResolved ? text : demoteExports(text)))
+    .map(({ filePath, text }) =>
+      filePath === entryResolved || preserveAllExports ? text : demoteExports(text),
+    )
     .join('\n\n');
 
-  const forbidden = [
-    'LibraryEngineDeps',
-    'RedisCommandClient',
-    'createRedisClient',
-    'runLibraryHealthCheck',
-    'runLibraryDiagnosis',
-    'saveLibrarySnapshot',
-    'loadDotenv',
-    'createLlmClientFromEnv',
-  ];
-  for (const name of forbidden) {
-    const exported = new RegExp(
-      `^export\\s+(?:declare\\s+)?(?:function|class|interface|type|const)\\s+${name}\\b`,
-      'm',
-    );
-    const exportedList = new RegExp(`export\\s+(?:type\\s+)?\\{[^}]*\\b${name}\\b[^}]*\\}`, 'm');
-    if (exported.test(bundled) || exportedList.test(bundled)) {
-      throw new Error(`Bundled library types must not export ${name}.`);
+  if (!preserveAllExports) {
+    const forbidden = [
+      'LibraryEngineDeps',
+      'RedisCommandClient',
+      'createRedisClient',
+      'runLibraryHealthCheck',
+      'runLibraryDiagnosis',
+      'saveLibrarySnapshot',
+      'loadDotenv',
+      'createLlmClientFromEnv',
+    ];
+    for (const name of forbidden) {
+      const exported = new RegExp(
+        `^export\\s+(?:declare\\s+)?(?:function|class|interface|type|const)\\s+${name}\\b`,
+        'm',
+      );
+      const exportedList = new RegExp(`export\\s+(?:type\\s+)?\\{[^}]*\\b${name}\\b[^}]*\\}`, 'm');
+      if (exported.test(bundled) || exportedList.test(bundled)) {
+        throw new Error(`Bundled library types must not export ${name}.`);
+      }
     }
   }
 
   if (bundled.includes('@redis-detective/')) {
     throw new Error('Bundled library types still reference @redis-detective/* workspace packages.');
+  }
+
+  if (preserveAllExports && !/\bexport\b/.test(bundled)) {
+    throw new Error(
+      'Bundled library types with preserveAllExports produced no exports — the result would not be a module.',
+    );
   }
 
   return `${bundled.trim()}\n`;

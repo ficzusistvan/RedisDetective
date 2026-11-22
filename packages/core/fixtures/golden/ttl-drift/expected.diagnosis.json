@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "reportType": "diagnosis",
+  "generatedAt": "2026-08-25T14:00:00.000Z",
+  "target": null,
+  "storeLocation": "<golden>/ttl-drift",
+  "savedLocation": null,
+  "repository": null,
+  "lookbackHours": null,
+  "commitLookupSkippedBecauseNoGrowth": false,
+  "snapshots": [
+    {
+      "snapshotId": "ttl-a",
+      "capturedAt": "2026-08-25T10:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 67108864,
+        "usedMemoryRssBytes": 80530637,
+        "usedMemoryDatasetBytes": 60397978,
+        "usedMemoryPeakBytes": 67108864,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "session:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 10000,
+          "estimatedBytes": 52428800,
+          "bytesMeasured": true,
+          "keysWithTtl": 100,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "ttl-b",
+      "capturedAt": "2026-08-25T11:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 69206016,
+        "usedMemoryRssBytes": 83047219,
+        "usedMemoryDatasetBytes": 62285414,
+        "usedMemoryPeakBytes": 69206016,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "session:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 10000,
+          "estimatedBytes": 54525952,
+          "bytesMeasured": true,
+          "keysWithTtl": 20,
+          "keysWithoutTtl": 80,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    }
+  ],
+  "commitCandidates": [],
+  "explanation": {
+    "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-59e5ce63",
+    "generatedAt": "2026-08-25T14:00:00.000Z",
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-59e5ce63",
+    "headline": "The evidence does not support naming a cause.",
+    "summary": "No anomaly, attribution or TTL drift was established from the 2 snapshot(s) supplied at 2026-08-25 14:00 UTC.",
+    "likelyCause": null,
+    "hintedCandidateShas": [],
+    "supportingEvidence": [],
+    "recommendedActions": [],
+    "evidenceStrength": "unclear",
+    "unknowns": [],
+    "model": null
+  },
+  "graph": {
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-59e5ce63",
+    "builtAt": "2026-08-25T14:00:00.000Z",
+    "window": {
+      "from": "2026-08-25T10:00:00.000Z",
+      "to": "2026-08-25T11:00:00.000Z"
+    },
+    "snapshotIds": [
+      "ttl-a",
+      "ttl-b"
+    ],
+    "anomalies": [],
+    "attributions": [],
+    "ttlDrift": [
+      {
+        "eventId": "ttl-drift-session-ttl-coverage-declining-ttl-a-ttl-b-5126abcf",
+        "pattern": "session:*",
+        "kind": "ttl-coverage-declining",
+        "window": {
+          "from": "2026-08-25T10:00:00.000Z",
+          "to": "2026-08-25T11:00:00.000Z"
+        },
+        "ttlCoverageBefore": 1,
+        "ttlCoverageAfter": 0.2,
+        "medianTtlSecondsBefore": 3600,
+        "medianTtlSecondsAfter": 3600,
+        "snapshotIdBefore": "ttl-a",
+        "snapshotIdAfter": "ttl-b",
+        "evidenceStrength": "moderate",
+        "observations": [
+          "TTL coverage for session:* moved from 100.0% to 20.0%, measured across 100 sampled keys before and 100 after.",
+          "Coverage fell by 80.0 percentage points, so some writers still set an expiry and others no longer do."
+        ]
+      }
+    ],
+    "gaps": []
+  }
+}

@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "reportType": "diagnosis",
+  "generatedAt": "2026-08-25T14:00:00.000Z",
+  "target": null,
+  "storeLocation": "<golden>/below-threshold-growth",
+  "savedLocation": null,
+  "repository": null,
+  "lookbackHours": null,
+  "commitLookupSkippedBecauseNoGrowth": false,
+  "snapshots": [
+    {
+      "snapshotId": "large-a",
+      "capturedAt": "2026-08-25T10:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 943718400,
+        "usedMemoryRssBytes": 1132462080,
+        "usedMemoryDatasetBytes": 849346560,
+        "usedMemoryPeakBytes": 943718400,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "payload:*",
+          "dataType": "string",
+          "sampledKeyCount": 200,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 100000,
+          "estimatedBytes": 891289600,
+          "bytesMeasured": true,
+          "keysWithTtl": 200,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "large-b",
+      "capturedAt": "2026-08-25T11:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 954204160,
+        "usedMemoryRssBytes": 1145044992,
+        "usedMemoryDatasetBytes": 858783744,
+        "usedMemoryPeakBytes": 954204160,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "payload:*",
+          "dataType": "string",
+          "sampledKeyCount": 200,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 101000,
+          "estimatedBytes": 901775360,
+          "bytesMeasured": true,
+          "keysWithTtl": 200,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    }
+  ],
+  "commitCandidates": [],
+  "explanation": {
+    "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-5290e6cb",
+    "generatedAt": "2026-08-25T14:00:00.000Z",
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-5290e6cb",
+    "headline": "Memory grew 9 MiB (+1.1%), below anomaly thresholds (8 MiB and 2%).",
+    "summary": "Memory grew 9 MiB (+1.1%), below anomaly thresholds (8 MiB and 2%). payload:* contributed the most estimated growth, 10 MiB. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
+    "likelyCause": null,
+    "hintedCandidateShas": [],
+    "supportingEvidence": [
+      {
+        "evidenceId": "gap:no-growth-detected",
+        "kind": "gap",
+        "statement": "Memory grew 9 MiB (+1.1%), below anomaly thresholds (8 MiB and 2%). payload:* contributed the most estimated growth, 10 MiB. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC."
+      }
+    ],
+    "recommendedActions": [],
+    "evidenceStrength": "unclear",
+    "unknowns": [
+      "Memory grew 9 MiB (+1.1%), below anomaly thresholds (8 MiB and 2%). payload:* contributed the most estimated growth, 10 MiB. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC."
+    ],
+    "model": null
+  },
+  "graph": {
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-5290e6cb",
+    "builtAt": "2026-08-25T14:00:00.000Z",
+    "window": {
+      "from": "2026-08-25T10:00:00.000Z",
+      "to": "2026-08-25T11:00:00.000Z"
+    },
+    "snapshotIds": [
+      "large-a",
+      "large-b"
+    ],
+    "anomalies": [],
+    "attributions": [],
+    "ttlDrift": [],
+    "gaps": [
+      {
+        "kind": "no-growth-detected",
+        "detail": "Memory grew 9 MiB (+1.1%), below anomaly thresholds (8 MiB and 2%). payload:* contributed the most estimated growth, 10 MiB. Across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
+        "remedy": null
+      }
+    ]
+  }
+}

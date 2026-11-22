@@ -1,6 +1,6 @@
 import { sampleRedisState } from '@redis-detective/sampler';
 import type { RedisCommandClient, SamplerOptions } from '@redis-detective/sampler';
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 import { redactExampleKeys } from './redact-example-keys.js';
 

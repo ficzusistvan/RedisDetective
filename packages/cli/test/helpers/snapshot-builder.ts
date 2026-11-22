@@ -1,4 +1,4 @@
-import type { KeyPatternStats, RedisSnapshot, SamplingMetadata } from '@redis-detective/core-types';
+import type { KeyPatternStats, RedisSnapshot, SamplingMetadata } from '@redis-detective/core';
 
 /**
  * Builds a snapshot for report tests.

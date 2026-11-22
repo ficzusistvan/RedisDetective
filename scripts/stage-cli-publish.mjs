@@ -66,6 +66,7 @@ const workspacePackages = [
   'github-integration',
   'reasoner',
   'alerts',
+  'core',
   'cli',
 ];
 for (const name of workspacePackages) {

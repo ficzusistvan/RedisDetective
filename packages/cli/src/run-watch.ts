@@ -1,9 +1,9 @@
-import type { RedisSnapshot } from '@redis-detective/core-types';
-import type { EvidenceOptions } from '@redis-detective/evidence';
+import type { RedisSnapshot } from '@redis-detective/core';
+import type { EvidenceOptions } from '@redis-detective/core';
 import type { RedisCommandClient } from '@redis-detective/sampler';
 
 import { CLI_NAME } from './cli-usage.js';
-import type { DiagnosisReport } from './diagnosis-report.js';
+import type { DiagnosisReport } from '@redis-detective/core';
 import { formatDuration } from './format-bytes.js';
 import { formatWatchTick } from './format-watch-tick.js';
 import type { PushResult } from './push-snapshots.js';

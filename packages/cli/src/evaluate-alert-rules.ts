@@ -1,7 +1,7 @@
 import type { EvaluatedAlertRule } from '@redis-detective/alerts';
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
-import { evaluateCiGate } from './evaluate-ci-gate.js';
+import { evaluateCiGate } from '@redis-detective/core';
 import type { AlertRule } from '@redis-detective/alerts';
 
 /**

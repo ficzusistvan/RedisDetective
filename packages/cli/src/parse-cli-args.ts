@@ -5,7 +5,7 @@ import {
   parseAlertDurationMs,
 } from '@redis-detective/alerts';
 import type { AlertSeverity } from '@redis-detective/alerts';
-import { EvidenceOptionsError, resolveEvidenceOptions } from '@redis-detective/evidence';
+import { EvidenceOptionsError, resolveEvidenceOptions } from '@redis-detective/core';
 import {
   GITHUB_APP_ENV_VARS,
   GITHUB_PERSONAL_TOKEN_ENV_VARS,
@@ -13,7 +13,7 @@ import {
 
 import { commandFromArgv } from './command-from-argv.js';
 import type { CliCommand } from './command-from-argv.js';
-import type { CiGateThresholds } from './evaluate-ci-gate.js';
+import type { CiGateThresholds } from '@redis-detective/core';
 import { isCliOutputFormat } from './output-format.js';
 import type { CliOutputFormat } from './output-format.js';
 import { MIN_WATCH_INTERVAL_MS } from './watch-defaults.js';

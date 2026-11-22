@@ -1,0 +1,174 @@
+{
+  "schemaVersion": 1,
+  "reportType": "diagnosis",
+  "generatedAt": "2026-08-25T14:00:00.000Z",
+  "target": null,
+  "storeLocation": "<golden>/flat-no-growth",
+  "savedLocation": null,
+  "repository": null,
+  "lookbackHours": null,
+  "commitLookupSkippedBecauseNoGrowth": false,
+  "snapshots": [
+    {
+      "snapshotId": "flat-a",
+      "capturedAt": "2026-08-25T10:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 209715200,
+        "usedMemoryRssBytes": 251658240,
+        "usedMemoryDatasetBytes": 188743680,
+        "usedMemoryPeakBytes": 209715200,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cache:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 10000,
+          "estimatedBytes": 188743680,
+          "bytesMeasured": true,
+          "keysWithTtl": 100,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    },
+    {
+      "snapshotId": "flat-b",
+      "capturedAt": "2026-08-25T11:00:00.000Z",
+      "instance": {
+        "redisVersion": "7.2.4",
+        "mode": "standalone",
+        "role": "master",
+        "maxmemoryBytes": 2147483648,
+        "maxmemoryPolicy": "noeviction",
+        "uptimeSeconds": 86400
+      },
+      "memory": {
+        "usedMemoryBytes": 209715200,
+        "usedMemoryRssBytes": 251658240,
+        "usedMemoryDatasetBytes": 188743680,
+        "usedMemoryPeakBytes": 209715200,
+        "memFragmentationRatio": 1.2,
+        "evictedKeys": 0,
+        "expiredKeys": 0
+      },
+      "keyspace": [
+        {
+          "db": 0,
+          "keyCount": 100000,
+          "keysWithExpiry": 90000,
+          "averageTtlMs": 3600000
+        }
+      ],
+      "patterns": [
+        {
+          "pattern": "cache:*",
+          "dataType": "string",
+          "sampledKeyCount": 100,
+          "sampledBytes": 512000,
+          "estimatedKeyCount": 10000,
+          "estimatedBytes": 188743680,
+          "bytesMeasured": true,
+          "keysWithTtl": 100,
+          "keysWithoutTtl": 0,
+          "medianTtlSeconds": 3600,
+          "exampleKeys": [
+            "session:aaa111",
+            "session:bbb222"
+          ],
+          "estimateBasis": "sampled-extrapolation"
+        }
+      ],
+      "sampling": {
+        "strategy": "randomized-scan",
+        "requestedSampleSize": 1000,
+        "observedSampleSize": 1000,
+        "scanPasses": 10,
+        "effectiveSampleRate": 0.1,
+        "durationMs": 250,
+        "truncated": false,
+        "warnings": []
+      }
+    }
+  ],
+  "commitCandidates": [],
+  "explanation": {
+    "explanationId": "explanation-graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-f3d411e5",
+    "generatedAt": "2026-08-25T14:00:00.000Z",
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-f3d411e5",
+    "headline": "No memory growth was found in this window.",
+    "summary": "No memory growth was found across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
+    "likelyCause": null,
+    "hintedCandidateShas": [],
+    "supportingEvidence": [
+      {
+        "evidenceId": "gap:no-growth-detected",
+        "kind": "gap",
+        "statement": "No memory growth was found across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC."
+      }
+    ],
+    "recommendedActions": [],
+    "evidenceStrength": "unclear",
+    "unknowns": [
+      "No memory growth was found across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC."
+    ],
+    "model": null
+  },
+  "graph": {
+    "graphId": "graph-2026-08-25t10-00-00-000z-2026-08-25t11-00-00-000-f3d411e5",
+    "builtAt": "2026-08-25T14:00:00.000Z",
+    "window": {
+      "from": "2026-08-25T10:00:00.000Z",
+      "to": "2026-08-25T11:00:00.000Z"
+    },
+    "snapshotIds": [
+      "flat-a",
+      "flat-b"
+    ],
+    "anomalies": [],
+    "attributions": [],
+    "ttlDrift": [],
+    "gaps": [
+      {
+        "kind": "no-growth-detected",
+        "detail": "No memory growth was found across 2 snapshots from 2026-08-25 10:00 UTC to 2026-08-25 11:00 UTC.",
+        "remedy": null
+      }
+    ]
+  }
+}

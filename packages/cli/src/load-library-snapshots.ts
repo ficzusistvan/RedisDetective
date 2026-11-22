@@ -1,5 +1,5 @@
 import type { LoadedSnapshot } from './loaded-snapshot.js';
-import { serializeSnapshot } from './serialize-snapshot.js';
+import { serializeSnapshot } from '@redis-detective/core';
 import { createFileSnapshotStore } from './snapshot-store.js';
 
 export type { LoadedSnapshot } from './loaded-snapshot.js';

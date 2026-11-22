@@ -43,10 +43,10 @@ describe('parseStoredSnapshot', () => {
     ).toThrow(StoredSnapshotError);
   });
 
-  it('rejects a different schema version', () => {
+  it('rejects a newer schema version with an upgrade message', () => {
     expect(() =>
       parseStoredSnapshot(stored(serializeSnapshot(snapshotFixture()), 2), location),
-    ).toThrow(/schemaVersion/);
+    ).toThrow(/newer redis-detective/);
   });
 
   it('rejects a missing field, naming the file so the user can go and look', () => {

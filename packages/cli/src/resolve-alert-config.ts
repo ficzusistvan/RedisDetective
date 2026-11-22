@@ -10,7 +10,7 @@ import {
 } from '@redis-detective/alerts';
 import type { ResolvedAlertConfig } from '@redis-detective/alerts';
 
-import { hasCiGateThresholds } from './evaluate-ci-gate.js';
+import { hasCiGateThresholds } from '@redis-detective/core';
 import type { CliOptions } from './parse-cli-args.js';
 import { CliUsageError } from './parse-cli-args.js';
 

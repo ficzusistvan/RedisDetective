@@ -1,4 +1,4 @@
-import type { KeyPatternStats } from '@redis-detective/core-types';
+import type { KeyPatternStats } from '@redis-detective/core';
 
 import { STRENGTH_LABEL } from './evidence-vocabulary.js';
 import {

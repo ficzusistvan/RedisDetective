@@ -61,6 +61,35 @@ unreadable snapshot files throw `StoredSnapshotError`.
 The `redis-detective` binary is unchanged: `npx redis-detective`, `watch`, `--json`, and `--repo`
 keep working as before.
 
+## Library: `@redis-detective/core`
+
+Side-effect-free analysis for callers that already have snapshots (or the private web runner). No
+Redis client, no GitHub, no filesystem — pass snapshots and a `generatedAt` timestamp in.
+
+```bash
+npm install @redis-detective/core
+```
+
+```ts
+import { diagnoseSnapshots, parseStoredSnapshot } from '@redis-detective/core';
+
+const snapshots = rawFiles.map((raw, i) =>
+  parseStoredSnapshot(JSON.parse(raw), `snapshot-${i}`),
+);
+
+const diagnosis = await diagnoseSnapshots({
+  snapshots,
+  generatedAt: new Date().toISOString(),
+  storeLocation: './snaps',
+});
+```
+
+`diagnoseSnapshots` returns the same `DiagnosisJson` as
+`redis-detective --snapshots <dir> --json --skip-gh` with no repository connected. Snapshot file
+versioning and the draft-2020-12 schema live in the package (`SNAPSHOT_FORMAT.md`,
+`@redis-detective/core/snapshot-file.schema.json`). Golden fixtures under `fixtures/golden` are
+the shared oracle for CLI and web tests.
+
 ## What is using memory now
 
 One run reports the patterns holding memory, which of them have little or no TTL coverage,

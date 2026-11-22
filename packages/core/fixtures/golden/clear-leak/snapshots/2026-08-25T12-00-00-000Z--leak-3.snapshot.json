@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "snapshot": {
+    "snapshotId": "leak-3",
+    "capturedAt": "2026-08-25T12:00:00.000Z",
+    "instance": {
+      "redisVersion": "7.2.4",
+      "mode": "standalone",
+      "role": "master",
+      "maxmemoryBytes": 2147483648,
+      "maxmemoryPolicy": "noeviction",
+      "uptimeSeconds": 86400
+    },
+    "memory": {
+      "usedMemoryBytes": 83886080,
+      "usedMemoryRssBytes": 100663296,
+      "usedMemoryDatasetBytes": 75497472,
+      "usedMemoryPeakBytes": 83886080,
+      "memFragmentationRatio": 1.2,
+      "evictedKeys": 0,
+      "expiredKeys": 0
+    },
+    "keyspace": [
+      {
+        "db": 0,
+        "keyCount": 50000,
+        "keysWithExpiry": 9000,
+        "averageTtlMs": 3600000
+      }
+    ],
+    "patterns": [
+      {
+        "pattern": "cart:items:*",
+        "dataType": "string",
+        "sampledKeyCount": 100,
+        "sampledBytes": 512000,
+        "estimatedKeyCount": 41000,
+        "estimatedBytes": 48234496,
+        "bytesMeasured": true,
+        "keysWithTtl": 30,
+        "keysWithoutTtl": 70,
+        "medianTtlSeconds": 3600,
+        "exampleKeys": [
+          "cart:items:aaa",
+          "cart:items:bbb"
+        ],
+        "estimateBasis": "sampled-extrapolation"
+      }
+    ],
+    "sampling": {
+      "strategy": "randomized-scan",
+      "requestedSampleSize": 1000,
+      "observedSampleSize": 1000,
+      "scanPasses": 10,
+      "effectiveSampleRate": 0.1,
+      "durationMs": 250,
+      "truncated": false,
+      "warnings": []
+    }
+  }
+}

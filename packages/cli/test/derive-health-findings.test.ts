@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { deriveHealthFindings } from '@redis-detective/cli';
 import type { HealthFindingKind } from '@redis-detective/cli';
-import type { RedisSnapshot } from '@redis-detective/core-types';
+import type { RedisSnapshot } from '@redis-detective/core';
 
 import { patternFixture, samplingFixture, snapshotFixture } from './helpers/snapshot-builder.js';
 

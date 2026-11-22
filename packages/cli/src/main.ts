@@ -6,9 +6,9 @@ import {
   processAlertTick,
 } from '@redis-detective/alerts';
 import type { AlertFetch, AlertStateStore, AlertWait } from '@redis-detective/alerts';
-import { NotImplementedError } from '@redis-detective/core-types';
-import type { RedisSnapshot } from '@redis-detective/core-types';
-import type { EvidenceOptions } from '@redis-detective/evidence';
+import { NotImplementedError } from '@redis-detective/core';
+import type { RedisSnapshot } from '@redis-detective/core';
+import type { EvidenceOptions } from '@redis-detective/core';
 import {
   FindCandidateCommitsError,
   GitHubApiError,
@@ -23,7 +23,7 @@ import type {
   GitHubFetch,
   GitHubRepositoryRef,
 } from '@redis-detective/github-integration';
-import type { LlmClient } from '@redis-detective/reasoner';
+import type { LlmClient } from '@redis-detective/core';
 
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -36,14 +36,14 @@ import { createGitHubCommitSource } from './create-github-commit-source.js';
 import type { ReadGhAuthToken } from './create-github-commit-source.js';
 import { createLlmClientFromEnv } from './create-llm-client-from-env.js';
 import { evaluateAlertRules } from './evaluate-alert-rules.js';
-import { evaluateCiGate, hasCiGateThresholds } from './evaluate-ci-gate.js';
-import type { CiGateResult } from './evaluate-ci-gate.js';
+import { evaluateCiGate, hasCiGateThresholds } from '@redis-detective/core';
+import type { CiGateResult } from '@redis-detective/core';
 import { EXIT_CODES } from './exit-codes.js';
 import type { ExitCode } from './exit-codes.js';
 import { formatWatchAlertBanner } from './format-watch-alert-banner.js';
 import { CliUsageError, parseCliArgs } from './parse-cli-args.js';
 import type { CliOptions } from './parse-cli-args.js';
-import { StoredSnapshotError } from './parse-stored-snapshot.js';
+import { StoredSnapshotError } from '@redis-detective/core';
 import { redactRedisUrl } from './redact-redis-url.js';
 import { resolveAlertConfig } from './resolve-alert-config.js';
 import { runTestAlert } from './run-test-alert.js';

@@ -21,8 +21,8 @@ import type {
   DiagnosisJsonExplanation,
   DiagnosisJsonGraph,
   DiagnosisJsonTtlDrift,
-} from './diagnosis-json.js';
-import { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from './diagnosis-json.js';
+} from '@redis-detective/core';
+import { DIAGNOSIS_REPORT_SCHEMA_VERSION, DIAGNOSIS_REPORT_TYPE } from '@redis-detective/core';
 import type { DiagnosisOptions } from './diagnosis-options.js';
 import type { HealthCheckJson, HealthCheckJsonFinding } from './health-check-json.js';
 import { JSON_REPORT_SCHEMA_VERSION } from './health-check-json.js';
@@ -36,7 +36,7 @@ import { runLibraryDiagnosis } from './run-library-diagnosis.js';
 import { runLibraryHealthCheck } from './run-library-health-check.js';
 import type { SaveSnapshotOptions, SavedSnapshot } from './save-snapshot-options.js';
 import { saveLibrarySnapshot } from './save-library-snapshot.js';
-import { StoredSnapshotError } from './stored-snapshot-error.js';
+import { StoredSnapshotError } from '@redis-detective/core';
 
 export {
   DIAGNOSIS_REPORT_SCHEMA_VERSION,

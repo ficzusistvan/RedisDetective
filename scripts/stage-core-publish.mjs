@@ -94,6 +94,7 @@ if (!existsSync(entryDts)) {
 writeFileSync(libraryTypes, bundleLibraryDts(entryDts, { preserveAllExports: true }));
 
 copyFileSync(join(coreDir, 'snapshot-file.schema.json'), join(outDir, 'snapshot-file.schema.json'));
+copyFileSync(join(coreDir, 'SNAPSHOT_FORMAT.md'), join(outDir, 'SNAPSHOT_FORMAT.md'));
 cpSync(join(coreDir, 'fixtures', 'golden'), join(outDir, 'fixtures', 'golden'), {
   recursive: true,
 });
@@ -126,6 +127,7 @@ const publishedPackage = {
     'index.js',
     'index.d.ts',
     'snapshot-file.schema.json',
+    'SNAPSHOT_FORMAT.md',
     'fixtures',
     'README.md',
     'LICENSE',
@@ -175,6 +177,7 @@ const expectedFiles = new Set([
   'index.js',
   'index.d.ts',
   'snapshot-file.schema.json',
+  'SNAPSHOT_FORMAT.md',
   'package.json',
   'README.md',
   'LICENSE',
@@ -192,6 +195,8 @@ if (
   );
 }
 
+assertPackedFilesHaveNoLocalPaths(outDir, packedFiles);
+
 process.stdout.write(
   `Staged ${PUBLISHED_NAME}@${corePackage.version} in packages/core/publish (bundled, no dependencies).\n`,
 );
@@ -207,6 +212,31 @@ function listGoldenPaths(dir, prefix = '') {
     }
   }
   return paths;
+}
+
+/**
+ * Published fixtures must not leak the machine that generated them.
+ * Fail the pack if any packed file contains a Unix home path or a Windows drive path.
+ */
+function assertPackedFilesHaveNoLocalPaths(root, packed) {
+  // Windows drive paths are `C:\` / `C:/…`. Do not treat `https://` as a drive letter.
+  const localPath = /\/Users\/|\/home\/|[A-Za-z]:\\|(?:^|[^a-zA-Z0-9])[A-Za-z]:\/(?!\/)/;
+  const offenders = [];
+  for (const relative of packed) {
+    const absolute = join(root, relative);
+    if (!existsSync(absolute)) {
+      continue;
+    }
+    const text = readFileSync(absolute, 'utf8');
+    if (localPath.test(text)) {
+      offenders.push(relative);
+    }
+  }
+  if (offenders.length > 0) {
+    fail(
+      `Packed files contain a local filesystem path (/Users/, /home/, or a Windows drive letter):\n${offenders.join('\n')}`,
+    );
+  }
 }
 
 function assertCoreBundle(text) {

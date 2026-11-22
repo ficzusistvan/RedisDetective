@@ -1,9 +1,11 @@
 /**
  * Records golden diagnosis outputs from the *current* CLI diagnosis path.
  *
- *   pnpm exec vitest run scripts/generate-golden-fixtures.test.ts
+ *   pnpm exec vitest run --config vitest.scripts.config.ts
  *
- * After the core extraction, packages/core tests regenerate with UPDATE_GOLDEN=1 instead.
+ * Store locations are written as `<fixtures>/<case>/snapshots` so published fixtures never embed a
+ * machine path. JSON still uses `<golden>/<case>`. After the core extraction, packages/core tests
+ * regenerate JSON with UPDATE_GOLDEN=1; re-run this script when text/markdown must change too.
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
@@ -244,8 +246,10 @@ async function writeCase(name: string, snapshots: readonly RedisSnapshot[]): Pro
     writeFileSync(join(snapsDir, snapshotFileName(snap)), `${JSON.stringify(file, null, 2)}\n`);
   }
 
+  // Never embed a real machine path — these fixtures ship in the published core package.
+  const storeLocation = `<fixtures>/${name}/snapshots`;
   const report = await runDiagnosis({
-    store: createMemorySnapshotStore(snapshots, caseDir),
+    store: createMemorySnapshotStore(snapshots, storeLocation),
     generatedAt: GENERATED_AT,
     target: null,
     sampleSize: null,

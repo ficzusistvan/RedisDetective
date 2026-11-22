@@ -48,12 +48,36 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           SOURCE_IS_PUBLIC: ${{ github.event.repository.visibility == 'public' }}
         run: |
+          # Normal npm publish of the staged package directory (not a dry-run / staged-only publish).
           if [ "$SOURCE_IS_PUBLIC" = "true" ]; then
             npm publish --access public --provenance
           else
             echo "Skipping npm provenance: source repository is not public."
             npm publish --access public
           fi
+      - name: Wait until @redis-detective/core is resolvable on the registry
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          version="$(node -p "require('./packages/core/package.json').version")"
+          package="@redis-detective/core@${version}"
+          tarball="/tmp/redis-detective-core-${version}.tgz"
+          echo "Waiting for ${package} to appear on npm…"
+          for attempt in $(seq 1 36); do
+            if npm view "${package}" version >/tmp/core-view.txt 2>/tmp/core-view.err \
+              && [ "$(tr -d '[:space:]' </tmp/core-view.txt)" = "${version}" ]; then
+              dist_tarball="$(npm view "${package}" dist.tarball)"
+              if [ -n "$dist_tarball" ] && curl -fsSL "$dist_tarball" -o "$tarball"; then
+                echo "Resolved ${package}; downloaded $(wc -c <"$tarball") bytes from ${dist_tarball}."
+                exit 0
+              fi
+            fi
+            echo "Attempt ${attempt}/36: not ready yet; sleeping 10s."
+            sleep 10
+          done
+          echo "Timed out waiting for ${package} on npm." >&2
+          cat /tmp/core-view.err >&2 || true
+          exit 1
       - name: Publish redis-detective to npm
         working-directory: packages/cli/publish
         env:

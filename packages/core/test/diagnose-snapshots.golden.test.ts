@@ -40,6 +40,14 @@ function loadExpected(caseName: string): DiagnosisJson {
   ) as DiagnosisJson;
 }
 
+function loadExpectedText(caseName: string): string {
+  return readFileSync(join(goldenRoot, caseName, 'expected.text.txt'), 'utf8');
+}
+
+function loadExpectedMarkdown(caseName: string): string {
+  return readFileSync(join(goldenRoot, caseName, 'expected.markdown.md'), 'utf8');
+}
+
 function normalize(diagnosis: DiagnosisJson, caseName: string): DiagnosisJson {
   return {
     ...diagnosis,
@@ -47,6 +55,19 @@ function normalize(diagnosis: DiagnosisJson, caseName: string): DiagnosisJson {
     target: null,
     savedLocation: null,
   };
+}
+
+/**
+ * Store paths and clocks in published prose goldens must stay machine-independent.
+ * Text/markdown rendering lives in the CLI; this package asserts the files themselves stay clean
+ * and that JSON diagnosis still matches. CLI golden tests compare rendered prose to these files.
+ */
+function assertProseGoldenIsPortable(text: string, caseName: string): void {
+  expect(text).not.toMatch(/\/Users\//);
+  expect(text).not.toMatch(/\/home\//);
+  // Windows drive paths only — do not treat `https://` as a drive letter.
+  expect(text).not.toMatch(/[A-Za-z]:\\|(?:^|[^a-zA-Z0-9])[A-Za-z]:\/(?!\/)/);
+  expect(text).toContain(`<fixtures>/${caseName}/snapshots`);
 }
 
 describe('diagnoseSnapshots golden fixtures', () => {
@@ -70,6 +91,11 @@ describe('diagnoseSnapshots golden fixtures', () => {
       }
 
       expect(actual).toEqual(loadExpected(caseName));
+    });
+
+    it(`${caseName} text and markdown goldens are portable`, () => {
+      assertProseGoldenIsPortable(loadExpectedText(caseName), caseName);
+      assertProseGoldenIsPortable(loadExpectedMarkdown(caseName), caseName);
     });
   }
 });

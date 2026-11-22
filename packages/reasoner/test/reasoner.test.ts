@@ -156,6 +156,44 @@ describe('summarizeEvidenceDeterministically', () => {
     expect(explanation.likelyCause).toBeNull();
     expect(explanation.evidenceStrength).toBe('unclear');
   });
+
+  it('reports established TTL drift when there is no memory anomaly or attribution', () => {
+    const input = reasonerInputFixture({
+      graph: evidenceGraphFixture({
+        ttlDrift: [
+          {
+            eventId: 'ttl-drift-session',
+            pattern: 'session:*',
+            kind: 'ttl-coverage-declining',
+            window: { from: '2026-08-25T10:00:00.000Z', to: '2026-08-25T11:00:00.000Z' },
+            ttlCoverageBefore: 1,
+            ttlCoverageAfter: 0.2,
+            medianTtlSecondsBefore: 3_600,
+            medianTtlSecondsAfter: 3_600,
+            snapshotIdBefore: 'ttl-a',
+            snapshotIdAfter: 'ttl-b',
+            evidenceStrength: 'moderate',
+            observations: ['coverage fell'],
+          },
+        ],
+      }),
+    });
+    const explanation = summarizeEvidenceDeterministically(input);
+
+    expect(explanation.likelyCause).toBeNull();
+    expect(explanation.headline).toBe('session:* TTL coverage moved from 100% to 20%.');
+    expect(explanation.summary).toContain('session:* TTL coverage moved from 100% to 20%');
+    expect(explanation.summary.toLowerCase()).not.toContain('no ttl drift');
+    expect(explanation.headline.toLowerCase()).not.toContain('does not support naming a cause');
+    expect(explanation.evidenceStrength).toBe('moderate');
+    expect(explanation.supportingEvidence.some((citation) => citation.kind === 'ttl-drift')).toBe(
+      true,
+    );
+    expect(explanation.recommendedActions.length).toBeGreaterThan(0);
+    const validation = validateExplanationAgainstEvidence(explanation, input);
+    expect(validation.violations).toEqual([]);
+    expect(validation.valid).toBe(true);
+  });
 });
 
 describe('buildExplanationPrompt', () => {

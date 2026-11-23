@@ -4,6 +4,7 @@ import type {
   AnomalyMetric,
   RedisSnapshot,
 } from '@redis-detective/core-types';
+import { ANOMALY_METRIC_PHRASE } from '@redis-detective/core-types';
 
 import type { ResolvedEvidenceOptions } from './evidence-options.js';
 import type { GrowthMetric } from './select-growth-metric.js';
@@ -148,8 +149,8 @@ function detectStepChange(
       // a transient buffer or a background save inflating one reading.
       hasCorroboratingSignal: relativeChange(keysBefore, keysAfter) >= options.minGrowthRatio,
       observations: [
-        describeChange(metric, valueBefore, valueAfter, 'bytes'),
-        describeChange('key count', keysBefore, keysAfter, 'keys'),
+        describeChange(ANOMALY_METRIC_PHRASE[metric], valueBefore, valueAfter, 'bytes'),
+        describeChange(ANOMALY_METRIC_PHRASE.key_count, keysBefore, keysAfter, 'keys'),
         `Change occurred within a single ${formatDuration(gapMs(interval.before, interval.after))} interval, so it is a step rather than a trend.`,
       ],
     },
@@ -198,8 +199,8 @@ function detectKeyCountGrowth(
       supportingSnapshotCount: run.length,
       hasCorroboratingSignal: memoryGrowth > 0,
       observations: [
-        describeChange('key count', keysBefore, keysAfter, 'keys'),
-        `Key count rose faster than ${metric}, so the instance is accumulating keys rather than storing larger values.`,
+        describeChange(ANOMALY_METRIC_PHRASE.key_count, keysBefore, keysAfter, 'keys'),
+        `Key count rose faster than ${ANOMALY_METRIC_PHRASE[metric]}, so the instance is accumulating keys rather than storing larger values.`,
       ],
     },
     run,
@@ -241,7 +242,7 @@ function detectFragmentationGrowth(
   const rssObservations =
     rssBefore === null || rssAfter === null
       ? []
-      : [describeChange('used_memory_rss', rssBefore, rssAfter, 'bytes')];
+      : [describeChange(ANOMALY_METRIC_PHRASE.used_memory_rss, rssBefore, rssAfter, 'bytes')];
 
   return finalize(
     {
@@ -259,9 +260,14 @@ function detectFragmentationGrowth(
         rssAfter !== null &&
         relativeChange(rssBefore, rssAfter) >= options.minGrowthRatio,
       observations: [
-        describeChange('mem_fragmentation_ratio', ratioBefore, ratioAfter, 'ratio'),
+        describeChange(
+          ANOMALY_METRIC_PHRASE.mem_fragmentation_ratio,
+          ratioBefore,
+          ratioAfter,
+          'ratio',
+        ),
         ...rssObservations,
-        `Stored data was flat across this window (${metric} changed by less than the ${options.minGrowthRatio} growth threshold), so the additional footprint is allocator overhead rather than new data.`,
+        `Stored data was flat across this window (${ANOMALY_METRIC_PHRASE[metric]} changed by less than the ${options.minGrowthRatio} growth threshold), so the additional footprint is allocator overhead rather than new data.`,
       ],
     },
     run,
@@ -295,13 +301,13 @@ function detectEvictionOnset(interval: Interval): AnomalyEvent | null {
       hasCorroboratingSignal:
         maxmemoryBytes !== null && used !== null && used >= maxmemoryBytes * 0.9,
       observations: [
-        describeChange('evicted_keys', before, after, 'keys'),
+        describeChange(ANOMALY_METRIC_PHRASE.evicted_keys, before, after, 'keys'),
         `Evictions began under the ${maxmemoryPolicy} policy, so the instance reached its ceiling during this interval and is discarding data.`,
         used === null
-          ? 'used_memory was not reported, so it cannot be compared with maxmemory.'
+          ? `${ANOMALY_METRIC_PHRASE.used_memory} was not reported, so it cannot be compared with maxmemory.`
           : maxmemoryBytes === null
             ? 'No maxmemory is configured on this instance, so the ceiling is the host.'
-            : `used_memory was ${used} bytes against a maxmemory of ${maxmemoryBytes} bytes.`,
+            : `${ANOMALY_METRIC_PHRASE.used_memory} was ${used} bytes against a maxmemory of ${maxmemoryBytes} bytes.`,
       ],
     },
     [interval.before, interval.after],
@@ -418,9 +424,9 @@ function detectSustainedGrowth(
       supportingSnapshotCount: run.length,
       hasCorroboratingSignal: relativeChange(keysBefore, keysAfter) >= options.minGrowthRatio,
       observations: [
-        describeChange(metric, valueBefore, valueAfter, 'bytes'),
-        describeChange('key count', keysBefore, keysAfter, 'keys'),
-        `${metric} rose in every one of the ${run.length - 1} intervals between ${run.length} consecutive snapshots, so this is a sustained trend rather than a single jump.`,
+        describeChange(ANOMALY_METRIC_PHRASE[metric], valueBefore, valueAfter, 'bytes'),
+        describeChange(ANOMALY_METRIC_PHRASE.key_count, keysBefore, keysAfter, 'keys'),
+        `${ANOMALY_METRIC_PHRASE[metric]} rose in every one of the ${run.length - 1} intervals between ${run.length} consecutive snapshots, so this is a sustained trend rather than a single jump.`,
       ],
     },
     run,

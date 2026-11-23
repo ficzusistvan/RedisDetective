@@ -257,7 +257,7 @@ describe('attributeGrowthToPatterns', () => {
 
     expect(attribution?.shareOfAnomalyGrowth).toBeCloseTo(1);
     expect(attribution?.observations.join(' ')).toContain(
-      'measured in keys because the anomaly was measured in key_count',
+      'measured in keys because the anomaly was measured in key count',
     );
   });
 

@@ -6,6 +6,7 @@ import type {
   TemporalRelation,
   TTLDriftEvent,
 } from '@redis-detective/core';
+import { ANOMALY_METRIC_PHRASE } from '@redis-detective/core';
 
 import { collectSamplingWarnings } from './collect-sampling-warnings.js';
 import type { DiagnosisReport } from '@redis-detective/core';
@@ -69,7 +70,8 @@ function renderCause(
   anomalies: readonly AnomalyEvent[],
 ): string {
   const anomaly = anomalies.find((event) => event.eventId === attribution.anomalyId);
-  const metric = anomaly?.metric ?? 'growth';
+  const metric =
+    anomaly === undefined ? 'growth' : ANOMALY_METRIC_PHRASE[anomaly.metric];
   const mechanism = EVIDENCE_VOCABULARY.mechanism[attribution.mechanism];
   const growthBits = [
     attribution.bytesGrowth !== 0 ? formatEstimatedBytes(attribution.bytesGrowth, true) : null,

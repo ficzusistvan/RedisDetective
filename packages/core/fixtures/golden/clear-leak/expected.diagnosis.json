@@ -261,7 +261,7 @@
         {
           "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
           "kind": "anomaly",
-          "statement": "Key count grew faster than memory on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+          "statement": "Key count grew faster than memory on the key count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
         },
         {
           "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
@@ -280,7 +280,7 @@
       {
         "evidenceId": "anomaly-key-count-growth-key-count-leak-1-leak-4-3f68ad0f",
         "kind": "anomaly",
-        "statement": "Key count grew faster than memory on key_count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
+        "statement": "Key count grew faster than memory on the key count between 2026-08-25 10:00 UTC and 2026-08-25 13:00 UTC."
       },
       {
         "evidenceId": "ttl-drift-cart-items-ttl-removed-leak-1-leak-4-a4e3ec23",
@@ -329,7 +329,7 @@
         "evidenceStrength": "strong",
         "observations": [
           "key count moved from 10000 keys to 70000 keys (+600.0%).",
-          "Key count rose faster than used_memory_dataset, so the instance is accumulating keys rather than storing larger values."
+          "Key count rose faster than dataset memory, so the instance is accumulating keys rather than storing larger values."
         ]
       },
       {
@@ -347,9 +347,9 @@
         "snapshotIdAfter": "leak-4",
         "evidenceStrength": "strong",
         "observations": [
-          "used_memory_dataset moved from 60397978 bytes to 83047219 bytes (+37.5%).",
+          "dataset memory moved from 60397978 bytes to 83047219 bytes (+37.5%).",
           "key count moved from 10000 keys to 70000 keys (+600.0%).",
-          "used_memory_dataset rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump."
+          "dataset memory rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump."
         ]
       }
     ],
@@ -373,7 +373,7 @@
           "estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).",
           "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
           "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
-          "Accounts for 100.0% of the key_count growth in this window.",
+          "Accounts for 100.0% of the key count growth in this window.",
           "Corroborated by TTL drift on the same pattern."
         ]
       },
@@ -396,7 +396,7 @@
           "estimated bytes for cart:items:* moved from 31457280 bytes to 56623104 bytes (+80.0%).",
           "estimated key count for cart:items:* moved from 1000 keys to 61000 keys (+6000.0%).",
           "mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).",
-          "Accounts for 100.0% of the used_memory_dataset growth in this window.",
+          "Accounts for 100.0% of the dataset memory growth in this window.",
           "Corroborated by TTL drift on the same pattern."
         ]
       }

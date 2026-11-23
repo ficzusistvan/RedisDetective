@@ -1,5 +1,6 @@
 import type {
   AnomalyKind,
+  AnomalyMetric,
   EvidenceGraph,
   EvidenceStrength,
   Explanation,
@@ -11,6 +12,7 @@ import type {
   TTLDriftEvent,
   TtlDriftKind,
 } from '@redis-detective/core-types';
+import { ANOMALY_METRIC_PHRASE } from '@redis-detective/core-types';
 
 import { gapEvidenceId } from './reasoner-input.js';
 import type { ReasonerInput } from './reasoner-input.js';
@@ -65,6 +67,19 @@ const ANOMALY_PHRASE: Record<AnomalyKind, string> = {
   'fragmentation-growth': 'Allocator overhead grew while stored data stayed flat',
   'key-count-growth': 'Key count grew faster than memory',
   'eviction-onset': 'The instance started evicting keys',
+};
+
+/**
+ * Metric wording for templates that read "on <metric>" / "(… on <metric>)".
+ * Adds an article where the bare phrase would otherwise sound telegraphic.
+ */
+const METRIC_IN_STATEMENT: Record<AnomalyMetric, string> = {
+  used_memory: ANOMALY_METRIC_PHRASE.used_memory,
+  used_memory_dataset: ANOMALY_METRIC_PHRASE.used_memory_dataset,
+  used_memory_rss: ANOMALY_METRIC_PHRASE.used_memory_rss,
+  mem_fragmentation_ratio: `the ${ANOMALY_METRIC_PHRASE.mem_fragmentation_ratio}`,
+  key_count: `the ${ANOMALY_METRIC_PHRASE.key_count}`,
+  evicted_keys: ANOMALY_METRIC_PHRASE.evicted_keys,
 };
 
 function weakestStrength(values: readonly EvidenceStrength[]): EvidenceStrength {
@@ -142,17 +157,18 @@ function ttlDriftStatement(event: TTLDriftEvent): string {
 
 function anomalyStatement(
   kind: AnomalyKind,
-  metric: string,
+  metric: AnomalyMetric,
   windowFrom: string,
   windowTo: string,
   deltaBytes: number | null,
 ): string {
   const phrase = ANOMALY_PHRASE[kind];
+  const metricPhrase = METRIC_IN_STATEMENT[metric];
   const window = `between ${windowFrom} and ${windowTo}`;
   if (deltaBytes === null) {
-    return `${phrase} on ${metric} ${window}.`;
+    return `${phrase} on ${metricPhrase} ${window}.`;
   }
-  return `${phrase} (${formatBytes(deltaBytes)} on ${metric}) ${window}.`;
+  return `${phrase} (${formatBytes(deltaBytes)} on ${metricPhrase}) ${window}.`;
 }
 
 function primaryAttribution(graph: EvidenceGraph): PatternAttribution | null {

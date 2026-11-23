@@ -23,7 +23,7 @@ cart:items:* grew by +24 MiB (100% of the anomaly) by keys stopped expiring. TTL
 
 ## Causes
 
-**`cart:items:*`** accounts for 100.0% of the key_count growth (strong evidence)
+**`cart:items:*`** accounts for 100.0% of the key count growth (strong evidence)
 
 Mechanism: keys stopped expiring
 
@@ -35,13 +35,13 @@ Mechanism: keys stopped expiring
 
 - mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
 
-- Accounts for 100.0% of the key_count growth in this window.
+- Accounts for 100.0% of the key count growth in this window.
 
 - Corroborated by TTL drift on the same pattern.
 
 → Find what writes this pattern and compare it against a working version. A SET that lost its EX argument, or an EXPIRE call that is no longer reached, grows memory forever and shows up in no error log.
 
-**`cart:items:*`** accounts for 100.0% of the used_memory_dataset growth (strong evidence)
+**`cart:items:*`** accounts for 100.0% of the dataset memory growth (strong evidence)
 
 Mechanism: keys stopped expiring
 
@@ -53,7 +53,7 @@ Mechanism: keys stopped expiring
 
 - mean bytes per key for cart:items:* moved from 31457 bytes to 928 bytes (-97.0%).
 
-- Accounts for 100.0% of the used_memory_dataset growth in this window.
+- Accounts for 100.0% of the dataset memory growth in this window.
 
 - Corroborated by TTL drift on the same pattern.
 
@@ -64,13 +64,13 @@ Mechanism: keys stopped expiring
 **Key count grew faster than memory** (strong evidence)
 
 - key count moved from 10000 keys to 70000 keys (+600.0%).
-- Key count rose faster than used_memory_dataset, so the instance is accumulating keys rather than storing larger values.
+- Key count rose faster than dataset memory, so the instance is accumulating keys rather than storing larger values.
 
 **Memory grew steadily** (strong evidence)
 
-- used_memory_dataset moved from 60397978 bytes to 83047219 bytes (+37.5%).
+- dataset memory moved from 60397978 bytes to 83047219 bytes (+37.5%).
 - key count moved from 10000 keys to 70000 keys (+600.0%).
-- used_memory_dataset rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump.
+- dataset memory rose in every one of the 3 intervals between 4 consecutive snapshots, so this is a sustained trend rather than a single jump.
 
 ## TTL drift
 

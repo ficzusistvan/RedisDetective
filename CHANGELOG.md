@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3
+
+Small wording fix for `@redis-detective/core` and `redis-detective`.
+
+### Diagnosis wording
+
+- **No snake_case metric ids in human output.** Explanation citations, evidence
+  observations, and text/markdown reports say “the key count” / “dataset memory”
+  instead of interpolating `key_count` or `used_memory_dataset`. Machine `metric`
+  fields on the JSON graph are unchanged. Golden prose checks also reject
+  camelCase identifiers and leftover template markers.
+
 ## 0.6.2
 
 Small wording and release-timing fixes for `@redis-detective/core` and `redis-detective`.

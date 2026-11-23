@@ -1,5 +1,6 @@
 import type {
   AnomalyEvent,
+  AnomalyKind,
   EvidenceGap,
   EvidenceGraph,
   PatternAttribution,
@@ -7,6 +8,7 @@ import type {
   TTLDriftEvent,
   TimeWindow,
 } from '@redis-detective/core-types';
+import { ANOMALY_METRIC_PHRASE } from '@redis-detective/core-types';
 
 import type { EvidenceOptions, ResolvedEvidenceOptions } from './evidence-options.js';
 import { attributeGrowthToPatterns } from './attribute-growth-to-patterns.js';
@@ -46,6 +48,19 @@ export interface BuildEvidenceGraphInput {
  * not to withhold a finding that is genuinely useful.
  */
 const MIN_EXPLAINED_SHARE = 0.5;
+
+/** Mid-sentence gloss for an anomaly kind. Never emit the kebab-case kind id in gap prose. */
+const ANOMALY_KIND_IN_GAP: Record<AnomalyKind, string> = {
+  'memory-growth': 'memory growth',
+  'memory-step-change': 'memory step change',
+  'fragmentation-growth': 'fragmentation growth',
+  'key-count-growth': 'key count growth',
+  'eviction-onset': 'eviction onset',
+};
+
+function anomalyKindInGap(kind: AnomalyKind): string {
+  return ANOMALY_KIND_IN_GAP[kind];
+}
 
 function windowOf(snapshots: readonly RedisSnapshot[], builtAt: string): TimeWindow {
   const first = snapshots[0];
@@ -130,10 +145,11 @@ function memoryReadingGaps(snapshots: readonly RedisSnapshot[]): readonly Eviden
 
   const details = excluded.map((snapshot) => {
     const bytes = readGrowthMetric(snapshot, metric);
+    const metricPhrase = ANOMALY_METRIC_PHRASE[metric];
     if (bytes === null) {
-      return `${snapshot.snapshotId} did not report ${metric}`;
+      return `${snapshot.snapshotId} did not report ${metricPhrase}`;
     }
-    return `${snapshot.snapshotId} reported ${metric} of 0 bytes while the keyspace still held ${totalKeyCount(snapshot)} keys, which is resident memory rather than an empty dataset`;
+    return `${snapshot.snapshotId} reported ${metricPhrase} of 0 bytes while the keyspace still held ${totalKeyCount(snapshot)} keys, which is resident memory rather than an empty dataset`;
   });
 
   return [
@@ -194,7 +210,7 @@ function attributionGaps(
     if (explained < MIN_EXPLAINED_SHARE) {
       gaps.push({
         kind: 'unattributed-growth',
-        detail: `Only ${(explained * 100).toFixed(1)}% of the ${anomaly.kind} on ${anomaly.metric} between ${anomaly.snapshotIdBefore} and ${anomaly.snapshotIdAfter} could be attributed to a key pattern. The change is measured; its cause is not established.`,
+        detail: `Only ${(explained * 100).toFixed(1)}% of the ${anomalyKindInGap(anomaly.kind)} on ${ANOMALY_METRIC_PHRASE[anomaly.metric]} between ${anomaly.snapshotIdBefore} and ${anomaly.snapshotIdAfter} could be attributed to a key pattern. The change is measured; its cause is not established.`,
         remedy:
           'A larger sample, or snapshots closer together, would narrow which pattern is responsible.',
       });

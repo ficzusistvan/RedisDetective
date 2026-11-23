@@ -5,6 +5,7 @@ import type {
   PatternAttribution,
   RedisSnapshot,
 } from '@redis-detective/core-types';
+import { ANOMALY_METRIC_PHRASE } from '@redis-detective/core-types';
 
 import type { ResolvedEvidenceOptions } from './evidence-options.js';
 import { createEvidenceId } from './create-evidence-id.js';
@@ -185,7 +186,7 @@ function growthBasis(
     unit: 'keys',
     total: keyGrowth,
     keyFallbackReason: bytesMeasured
-      ? `the anomaly was measured in ${anomaly.metric} rather than in bytes`
+      ? `the anomaly was measured in ${ANOMALY_METRIC_PHRASE[anomaly.metric]} rather than in bytes`
       : 'MEMORY USAGE was unavailable, so no byte figures exist',
   };
 }
@@ -269,7 +270,7 @@ export function attributeGrowthToPatterns(
     .map(({ diff, share }): PatternAttribution => {
       const unitNote =
         basis.keyFallbackReason === null
-          ? `Accounts for ${(share * 100).toFixed(1)}% of the ${anomaly.metric} growth in this window.`
+          ? `Accounts for ${(share * 100).toFixed(1)}% of the ${ANOMALY_METRIC_PHRASE[anomaly.metric]} growth in this window.`
           : `Accounts for ${(share * 100).toFixed(1)}% of the key growth in this window, measured in keys because ${basis.keyFallbackReason}.`;
 
       return {

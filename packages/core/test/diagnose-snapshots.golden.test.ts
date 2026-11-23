@@ -94,13 +94,53 @@ function collectExplanationProse(diagnosis: DiagnosisJson): readonly string[] {
   return parts;
 }
 
+/**
+ * Tokens that match the snake_case probe but are intentional human-facing wording, not leaked ids.
+ * Keep this list narrow; prefer fixing the prose over growing the allowlist.
+ */
+const HUMAN_PROSE_SNAKE_ALLOWLIST = [
+  // GitHub App permission scope cited in the no-repository-connected remedy.
+  'pull_requests',
+] as const;
+
+const KEBAB_INTERNAL_ID =
+  /\b(?:ttl-(?:removed|coverage-declining|lengthened)|never-expiring-growth|memory-(?:growth|step-change)|fragmentation-growth|key-count-growth|eviction-onset|more-keys|larger-values|keys-not-expiring|snapshot-gap|insufficient-snapshots|sample-too-small|unattributed-growth|no-growth-detected|pattern-not-comparable|memory-not-comparable|no-repository-connected|github-unavailable)\b/;
+
+const SNAKE_CASE_ID = /\b[a-z]+_[a-z_]+\b/;
+const CAMEL_CASE_ID = /\b[a-z]+[A-Z][a-zA-Z]+\b/;
+const CODE_MARKERS = /`|\$\{|\bundefined\b|\bNaN\b|\[object Object\]/;
+
+/**
+ * Strip intentional markdown inline code and fixture store paths before scanning for leaked
+ * identifiers. Markdown wraps Redis key patterns in backticks on purpose; fixture directories can
+ * share names with internal kind ids (e.g. `snapshot-gap`).
+ */
+function normalizeHumanOutputForProseCheck(text: string): string {
+  return text
+    .replace(/`[^`]*`/g, ' ')
+    .replace(/<fixtures>\/[a-z0-9-]+\/snapshots/g, '<fixtures>/case/snapshots')
+    .replace(/<golden>\/[a-z0-9-]+/g, '<golden>/case');
+}
+
+function assertHumanProse(text: string, label: string): void {
+  const prose = normalizeHumanOutputForProseCheck(text);
+  const snakeAllow = new Set<string>(HUMAN_PROSE_SNAKE_ALLOWLIST);
+  const snakeHits = [...prose.matchAll(new RegExp(SNAKE_CASE_ID, 'g'))]
+    .map((match) => match[0])
+    .filter((token) => !snakeAllow.has(token));
+
+  expect(prose, `${label} must not contain raw <digits>ms`).not.toMatch(/\d+ms\b/);
+  expect(prose, `${label} must not contain kebab-case internal ids`).not.toMatch(KEBAB_INTERNAL_ID);
+  expect(snakeHits, `${label} must not contain snake_case identifiers`).toEqual([]);
+  expect(prose, `${label} must not contain camelCase identifiers`).not.toMatch(CAMEL_CASE_ID);
+  expect(
+    prose,
+    `${label} must not contain leftover template or code markers`,
+  ).not.toMatch(CODE_MARKERS);
+}
+
 function assertExplanationProseIsHuman(diagnosis: DiagnosisJson, caseName: string): void {
-  const prose = collectExplanationProse(diagnosis).join('\n');
-  expect(prose, `${caseName} explanation must not contain raw <digits>ms`).not.toMatch(/\d+ms\b/);
-  // Internal evidence kind / mechanism / TTL-drift ids are kebab-case tokens.
-  expect(prose, `${caseName} explanation must not contain kebab-case internal ids`).not.toMatch(
-    /\b(?:ttl-(?:removed|coverage-declining|lengthened)|never-expiring-growth|memory-(?:growth|step-change)|fragmentation-growth|key-count-growth|eviction-onset|more-keys|larger-values|keys-not-expiring|snapshot-gap|insufficient-snapshots|sample-too-small|unattributed-growth|no-growth-detected|pattern-not-comparable|memory-not-comparable|no-repository-connected|github-unavailable)\b/,
-  );
+  assertHumanProse(collectExplanationProse(diagnosis).join('\n'), `${caseName} explanation`);
 }
 
 describe('diagnoseSnapshots golden fixtures', () => {
@@ -130,6 +170,11 @@ describe('diagnoseSnapshots golden fixtures', () => {
     it(`${caseName} text and markdown goldens are portable`, () => {
       assertProseGoldenIsPortable(loadExpectedText(caseName), caseName);
       assertProseGoldenIsPortable(loadExpectedMarkdown(caseName), caseName);
+    });
+
+    it(`${caseName} text and markdown goldens stay human-readable`, () => {
+      assertHumanProse(loadExpectedText(caseName), `${caseName} text`);
+      assertHumanProse(loadExpectedMarkdown(caseName), `${caseName} markdown`);
     });
   }
 });

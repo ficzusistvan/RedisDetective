@@ -19,7 +19,7 @@ export type {
   SamplingMetadata,
 } from './redis-snapshot.js';
 
-export { ANOMALY_KINDS, ANOMALY_METRICS } from './anomaly-event.js';
+export { ANOMALY_KINDS, ANOMALY_METRICS, ANOMALY_METRIC_PHRASE } from './anomaly-event.js';
 export type { AnomalyEvent, AnomalyKind, AnomalyMetric } from './anomaly-event.js';
 
 export { TTL_DRIFT_KINDS } from './ttl-drift-event.js';

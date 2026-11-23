@@ -28,6 +28,19 @@ export const ANOMALY_METRICS = [
 export type AnomalyMetric = (typeof ANOMALY_METRICS)[number];
 
 /**
+ * Plain-language gloss for each anomaly metric. Never emit the snake_case INFO / counter name in
+ * user-facing prose; keep the machine id on `AnomalyEvent.metric`.
+ */
+export const ANOMALY_METRIC_PHRASE = {
+  used_memory: 'memory usage',
+  used_memory_dataset: 'dataset memory',
+  used_memory_rss: 'RSS memory',
+  mem_fragmentation_ratio: 'fragmentation ratio',
+  key_count: 'key count',
+  evicted_keys: 'evicted keys',
+} as const satisfies Record<AnomalyMetric, string>;
+
+/**
  * Something measurably changed. An anomaly says *what* changed and *when*; it deliberately says
  * nothing about *why* — that is what `PatternAttribution` is for.
  */

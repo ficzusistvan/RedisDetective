@@ -154,7 +154,7 @@ describe('detectMemoryAnomalies', () => {
       const anomaly = detectMemoryAnomalies(series([64 * MB, 192 * MB]), options)[0];
 
       expect(anomaly?.deltaBytes).toBe((anomaly?.valueAfter ?? 0) - (anomaly?.valueBefore ?? 0));
-      expect(anomaly?.observations.join(' ')).toContain('used_memory_dataset moved from');
+      expect(anomaly?.observations.join(' ')).toContain('dataset memory moved from');
       expect(anomaly?.observations.join(' ')).toContain('step rather than a trend');
     });
 

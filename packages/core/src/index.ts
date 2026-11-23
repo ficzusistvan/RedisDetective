@@ -47,6 +47,7 @@ export {
   REDIS_DATA_TYPES,
   EVIDENCE_STRENGTHS,
   isEvidenceStrength,
+  ANOMALY_METRIC_PHRASE,
   NotImplementedError,
 } from '@redis-detective/core-types';
 export type { NotImplementedContext, NotImplementedContextValue } from '@redis-detective/core-types';

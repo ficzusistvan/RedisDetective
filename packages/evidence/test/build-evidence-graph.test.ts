@@ -93,7 +93,7 @@ describe('buildEvidenceGraph', () => {
       ]);
 
       expect(graph.gaps.map((gap) => gap.kind)).toEqual(['memory-not-comparable']);
-      expect(graph.gaps[0]?.detail).toContain('did not report used_memory');
+      expect(graph.gaps[0]?.detail).toContain('did not report memory usage');
     });
 
     it('keeps no-growth-detected when the comparable readings are flat around a resident zero', () => {

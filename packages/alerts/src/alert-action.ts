@@ -1,3 +1,2 @@
-export const ALERT_ACTIONS = ['firing', 'resolved'] as const;
-
-export type AlertAction = (typeof ALERT_ACTIONS)[number];
+export { ALERT_ACTIONS } from '@redis-detective/core';
+export type { AlertAction } from '@redis-detective/core';

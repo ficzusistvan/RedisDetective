@@ -30,6 +30,9 @@ const diagnosis = await diagnoseSnapshots({
 - Build an `EvidenceGraph` (`buildEvidenceGraph`) and explain it (`explainEvidence`, optional
   injected `LlmClient`).
 - Produce the CLI-identical `DiagnosisJson` via `diagnoseSnapshots` / `toDiagnosisJson`.
+- Evaluate CI-gate thresholds (`evaluateCiGate`) and the watch alert state machine
+  (`evaluateAlertTick`, `transitionAlertState`, `alertFingerprint` / `pagerdutyDedupKey`).
+  Notifiers, HTTP, config files, and the state store stay in the CLI / `@redis-detective/alerts`.
 
 Every derived byte count is an **estimate** unless labelled otherwise. There are no numeric
 confidence scores — only `strong` | `moderate` | `unclear`.
@@ -37,7 +40,9 @@ confidence scores — only `strong` | `moderate` | `unclear`.
 ## Purity
 
 This package does not import `node:*`, `fetch`, `process.env`, `Date.now()`, `Math.random()`,
-`redis`, or the sampler / GitHub / alerts packages. Pass `generatedAt` in. Node `>= 20.11`.
+`redis`, or the sampler / GitHub / alerts packages. Alert fingerprints use an in-package SHA-256
+so behaviour matches older CLIs without `node:crypto`. Pass `generatedAt` / `nowMs` in.
+Node `>= 20.11`.
 
 ## Snapshot contract
 

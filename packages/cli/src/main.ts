@@ -29,6 +29,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { CLI_NAME, CLI_VERSION, HELP_TEXT } from './cli-usage.js';
+import {
+  TEST_ALERT_DEPRECATION,
+  WATCH_CLI_ALERTING_DEPRECATION,
+} from './cli-alerting-deprecation.js';
 import { DEFAULT_COMMIT_LOOKBACK_HOURS } from './commit-lookup-defaults.js';
 import { RedisConnectionError, createRedisClient } from './create-redis-client.js';
 import type { RedisConnection } from './create-redis-client.js';
@@ -374,6 +378,9 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
   }
 
   const alertConfig = alertSetup.config;
+  if (alertConfig.rules.length > 0 || hasAlertChannels(alertConfig.channels)) {
+    streams.writeError(`${WATCH_CLI_ALERTING_DEPRECATION}\n`);
+  }
   const alertFetch =
     context.alertFetch ?? createAlertFetch((url, init) => globalThis.fetch(url, init));
   const openAlertStore = context.openAlertStateStore ?? createFileAlertStateStore;
@@ -575,6 +582,7 @@ function writePushReport(streams: MainStreams, report: SnapshotPushReport): Exit
 
 async function runTestAlertCommand(context: MainContext, options: CliOptions): Promise<ExitCode> {
   const { streams } = context;
+  streams.writeError(`${TEST_ALERT_DEPRECATION}\n`);
   if (options.outputFormat !== 'text') {
     streams.writeError(
       `test-alert prints a short confirmation per channel, so --format / --json do not apply.\n`,

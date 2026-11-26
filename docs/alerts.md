@@ -1,13 +1,45 @@
 # Watch alerts
 
-`redis-detective watch` can notify a team when the same thresholds as the CI
-gate are crossed. This is a local loop: the CLI posts to endpoints you
-configure. There is no hosted dashboard and no account.
+**Deprecated in 0.7.x.** CLI-hosted Slack / webhook / PagerDuty delivery from `watch`,
+and `test-alert` / `alerts test`, still work for the rest of the 0.7 line and are
+planned for **removal in 0.8 / 1.0**. Prefer **redis-detective-web** for hosted
+alerting (channels, secrets, and history). This repo stays the CLI plus
+`@redis-detective/core`: keep using `watch` / `watch --push` to sample and upload,
+and the one-shot `--fail-on-*` CI exit-code gate (not deprecated).
+
+`redis-detective watch` can still notify a team when the same thresholds as the CI
+gate are crossed. That path is a local loop: the CLI posts to endpoints you
+configure. Hosted dashboards and inbox live in the separate private repo
+`redis-detective-web`, not in this CLI package.
 
 Threshold math is **not** reimplemented here. Each tick calls
 `evaluateCiGate` with the rule's `--fail-on-*` numbers (oldest stored snapshot
-versus newest). The alert package only decides whether to notify, suppress, or
-resolve.
+versus newest). Core’s `evaluateAlertTick` decides whether to notify, suppress, or
+resolve; `packages/alerts` owns delivery I/O.
+
+## Scheduled removal (0.8 / 1.0)
+
+A later major should make this mechanical. Delete or move out of the CLI:
+
+- `packages/alerts` notifiers and HTTP (`slack-notifier.ts`, `webhook-notifier.ts`,
+  `pagerduty-notifier.ts`, `create-notifiers.ts`, `post-json-with-retry.ts`,
+  `alert-http.ts`, `sign-webhook-payload.ts`, and payload builders that exist only
+  to serve those notifiers if the CLI no longer uses them)
+- CLI commands and flags: `test-alert` / `alerts test` (`command-from-argv.ts`,
+  `run-test-alert.ts`), `--alert-*` / `REDIS_DETECTIVE_SLACK_WEBHOOK` and friends
+  (`ALERT_ENV_VARS`), config-file loading for channels (`resolve-alert-config.ts`
+  channel parts, `examples/alerts/*` as CLI examples)
+- `afterTick` notifier dispatch in `runWatchCommand`; file state store
+  `.redis-detective-alerts.json` (`DEFAULT_ALERT_STATE_FILE_NAME`,
+  `create-file-alert-state-store.ts`)
+- `.github/workflows/alerts-e2e.yml` and `e2e/alerts-*.mjs` once there is no CLI
+  channel to test
+
+**Keep in core (not deleted):** `evaluateCiGate`, `evaluateAlertTick`, fingerprints,
+state-transition types, finding/rule types.
+
+**Keep in CLI:** `watch` as a sampler, `watch --push` / `push`, one-shot diagnosis,
+CI gate exit code (`EXIT_CODES.thresholdExceeded` / 7).
 
 ## Quick start
 
@@ -27,7 +59,7 @@ redis-detective watch \
 Default is `warning`. PagerDuty receives a rule only when its severity is at
 least `--alert-pagerduty-min-severity` (default `critical`).
 
-Verify plumbing without waiting for a leak:
+Verify plumbing without waiting for a leak (also deprecated; prefer the web app):
 
 ```bash
 redis-detective test-alert
@@ -167,9 +199,8 @@ HTTP (including webhook HMAC), config-file parsing, and the state file.
 
 ## Adding a channel later
 
-Notifiers implement a small `Notifier` interface (`packages/alerts`). Paid
-channels (email, Teams, Opsgenie, a hosted dashboard) should use that seam.
+Notifiers implement a small `Notifier` interface (`packages/alerts`). New hosted
+channels belong in redis-detective-web, not as further long-lived CLI delivery.
 `isChannelEnabled` is the future license hook; it currently returns `true` for
 every shipping channel. Do not add a paywall here. Core must not know about
 licences.
-

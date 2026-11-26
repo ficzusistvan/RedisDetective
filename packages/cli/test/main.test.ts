@@ -184,9 +184,11 @@ describe('main', () => {
       expect(help).toContain('--warn-only');
       expect(help).toContain('Exit 7');
       expect(help).toContain('--alert-slack-webhook');
+      expect(help).toContain('Deprecated in 0.7.x');
       expect(help).toContain('test-alert');
       expect(help).toContain('--alert-dry-run');
       expect(help).toContain('X-Redis-Detective-Signature');
+      expect(help).toContain('redis-detective-web');
     });
 
     it('prints the version', async () => {
@@ -830,12 +832,33 @@ describe('main', () => {
 
       expect(result.exitCode).toBe(EXIT_CODES.ok);
       expect(fetches).toEqual([]);
+      expect(result.err).toContain('Deprecated');
+      expect(result.err).toContain('redis-detective-web');
       expect(result.out).toContain('Alerts: slack');
+      expect(result.out).toContain('Deprecated in 0.7.x');
       expect(result.out).toContain('alert firing');
       expect(result.out).toContain('--- alert dry-run slack ---');
       expect(result.out).toContain('cart:items:*');
       expect(result.out).not.toContain('secret');
       expect(result.out).not.toContain('T000');
+    });
+
+    it('does not print a CLI alerting deprecation when only sampling', async () => {
+      const stop = new AbortController();
+      const store = createMemorySnapshotStore([], './snaps');
+
+      const result = await run(
+        ['watch', '--url', 'redis://localhost:6379', '--snapshots', './snaps', '--interval', '15m'],
+        {
+          openSnapshotStore: () => store,
+          stopSignal: stop.signal,
+          watchDeps: stopAfterFirstInterval(stop, []),
+        },
+      );
+
+      expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.err).not.toContain('Deprecated');
+      expect(result.err).not.toContain('Slack/webhook/PagerDuty');
     });
 
     it('keeps watching and exits zero when a push is rejected', async () => {
@@ -896,6 +919,7 @@ describe('main', () => {
       expect(names[0]).toHaveLength(1);
       expect(names[1]).toHaveLength(1);
       expect(names[0]?.[0]).not.toBe(names[1]?.[0]);
+      expect(result.err).not.toContain('Deprecated');
       expect(result.out).toContain('Push failed:');
       expect(result.out).toContain('HTTP 413');
       expect(result.out).toContain('Attempted');
@@ -1008,6 +1032,8 @@ describe('main', () => {
       );
 
       expect(result.exitCode).toBe(EXIT_CODES.ok);
+      expect(result.err).toContain('Deprecated');
+      expect(result.err).toContain('test-alert');
       expect(result.out).toContain('test-alert webhook: sent');
       expect(posts).toHaveLength(1);
       expect(posts[0]?.url).toBe('https://example.com/hook');
@@ -1032,10 +1058,12 @@ describe('main', () => {
         },
       );
       expect(alias.exitCode).toBe(EXIT_CODES.ok);
+      expect(alias.err).toContain('Deprecated');
       expect(alias.out).toContain('--- alert dry-run slack ---');
 
       const missing = await run(['test-alert']);
       expect(missing.exitCode).toBe(EXIT_CODES.usageError);
+      expect(missing.err).toContain('Deprecated');
       expect(missing.err).toContain('channel');
     });
   });

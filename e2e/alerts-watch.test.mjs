@@ -146,6 +146,8 @@ describe('watch alerts against the TTL-drift demo', { timeout: 120_000 }, () => 
         3,
         `expected one fire per channel, got ${String(afterFire)}\n${stdout}`,
       );
+      assert.match(stdout, /Deprecated/);
+      assert.match(stdout, /redis-detective-web/);
       assert.match(stdout, /alert firing/);
       assert.match(stdout, /session:\*/);
 

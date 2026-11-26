@@ -14,10 +14,11 @@ output is a plain-language explanation an on-call engineer can act on, not a das
 root-cause, eviction root-cause, cost/billing correlation, multi-cloud support and hosted
 alerting SaaS (email, Teams, Opsgenie) are explicitly _not_ being built yet — see
 [`docs/mvp-scope.md`](docs/mvp-scope.md). Local `watch` notifications (Slack, generic webhook,
-PagerDuty) reuse the CI-gate thresholds; see [`docs/alerts.md`](docs/alerts.md). A hosted
-dashboard exists in the separate private repo `redis-detective-web`; this repo stays CLI +
-`@redis-detective/core` only, and web-specific code does not belong here. If a change only
-makes sense for an out-of-scope item, it does not belong in this repo yet.
+PagerDuty) reuse the CI-gate thresholds but are **deprecated in 0.7.x** (removal planned for
+0.8 / 1.0); see [`docs/alerts.md`](docs/alerts.md). A hosted dashboard and alerting live in the
+separate private repo `redis-detective-web`; this repo stays CLI + `@redis-detective/core` only,
+and web-specific code does not belong here. If a change only makes sense for an out-of-scope
+item, it does not belong in this repo yet.
 
 Phase 1 ships as a standalone read-only CLI (`packages/cli`, "Redis Memory Health Check") that
 works against any Redis URL with no signup, plus a public analysis library
@@ -233,8 +234,12 @@ API on the published `redis-detective` package are implemented. The `watch` subc
 diagnosis path on an interval into a local snapshot directory, with no commit lookup and no model
 call per tick. When thresholds and a channel are configured, core’s `evaluateAlertTick` decides
 notify / suppress / resolve; `packages/alerts` still owns notifiers, webhook HMAC, config files,
-and the state file (Slack, generic webhook, PagerDuty) without spamming. `test-alert` /
-`alerts test` sends one sample per channel. `push` uploads snapshots not yet accepted by that web
+and the state file (Slack, generic webhook, PagerDuty) without spamming — but that CLI delivery
+path is **deprecated in 0.7.x** (removal planned for 0.8 / 1.0); operators are warned toward
+redis-detective-web for hosted alerting. `test-alert` / `alerts test` still send one sample per
+channel and print the same deprecation. Sampling, `watch --push` / `push`, and the one-shot CI
+`--fail-on-*` gate are not deprecated. `push` uploads snapshots not yet accepted by that web
 instance, in batches under 4 MiB; `watch --push` uploads the snapshot it just took and keeps
-sampling if the upload fails. Both use an instance push token. Hosted alerting stays in
-`redis-detective-web`, not this repo. See `docs/alerts.md` and `docs/mvp-scope.md`.
+sampling if the upload fails. Both use an instance push token. Hosted channels, secrets, and
+history belong in `redis-detective-web`; this repo stays CLI + `@redis-detective/core`. See
+`docs/alerts.md` and `docs/mvp-scope.md`.

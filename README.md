@@ -142,11 +142,12 @@ you pass `--repo`, so a long session makes no GitHub requests — pass `--repo` 
 instead.
 
 This is a local loop writing JSON files to a directory you chose: no daemon, no server, no
-retention policy. When you arm `--fail-on-*` (the same thresholds as the CI gate) and a
-channel, a breach can notify Slack, a generic webhook, or PagerDuty. A persistent breach is
-deduplicated and held to `--alert-cooldown` (default 1h) so a 15-minute tick does not spam;
+retention policy. Optional CLI channel delivery (Slack / webhook / PagerDuty) still works in
+0.7.x when you arm `--fail-on-*` and a channel, but it is **deprecated** — prefer
+redis-detective-web for hosted alerting; removal is planned for 0.8 / 1.0. A persistent breach
+is deduplicated and held to `--alert-cooldown` (default 1h) so a 15-minute tick does not spam;
 state is a small JSON file next to the snapshots so a restart does not re-page. See
-[docs/alerts.md](docs/alerts.md). Nothing leaves the machine unless you ask it to.
+[docs/alerts.md](docs/alerts.md). Sampling and `watch --push` are not deprecated.
 
 ## Optional: push snapshots to redis-detective-web
 
@@ -377,26 +378,30 @@ sampling deadline of at most **30 s** (CLI `--timeout` defaults to 10 s and 
 ceiling), and an oversized `--sample-size` is **reduced**, not honoured. It never deletes keys,
 sets TTLs, or writes to Redis.
 
-This CLI does not write to Redis and does not treat commits as the Cause of growth. Alerting is
-opt-in on `watch`: without `--fail-on-*` / a config file and a channel, it still only prints one
-line per sample. Webhook URLs, routing keys, Redis passwords, and example keys are redacted in
-logs and payloads.
+This CLI does not write to Redis and does not treat commits as the Cause of growth. CLI channel
+alerting is opt-in and **deprecated in 0.7.x**: without `--fail-on-*` / a config file and a
+channel, `watch` still only prints one line per sample. Webhook URLs, routing keys, Redis
+passwords, and example keys are redacted in logs and payloads. The one-shot CI `--fail-on-*`
+gate (exit 7) is not deprecated.
 
-## Watch alerts
+## Watch alerts (deprecated in 0.7.x)
+
+Prefer redis-detective-web for hosted alerting. The CLI path below still works through 0.7.x
+and is planned for removal in 0.8 / 1.0. `watch` / `watch --push` for sampling and upload stay.
 
 ```bash
 export REDIS_DETECTIVE_SLACK_WEBHOOK='https://hooks.slack.com/services/…'
 redis-detective watch --url redis://localhost:6379 --snapshots ./snaps \
   --fail-on-ttl-drop 20 --alert-severity critical
-redis-detective test-alert   # or: redis-detective alerts test --alert-dry-run
+redis-detective test-alert   # deprecated; or: redis-detective alerts test --alert-dry-run
 ```
 
 Channels, in priority order: Slack incoming webhook (Block Kit), a generic versioned JSON
 webhook with optional HMAC-SHA256 (`X-Redis-Detective-Signature`), and PagerDuty Events API v2
 (stable `dedup_key` per host+pattern+rule; resolve when the condition clears). By default only
 `critical` rules page. Flags and `REDIS_DETECTIVE_*` env vars work; an optional
-`.redis-detective.json` / `.yaml` can name several rules. Setup, payload schema, and a sample
-Slack message: [docs/alerts.md](docs/alerts.md),
+`.redis-detective.json` / `.yaml` can name several rules. Setup, payload schema, removal
+checklist, and a sample Slack message: [docs/alerts.md](docs/alerts.md),
 [`examples/alerts/slack-sample.json`](examples/alerts/slack-sample.json).
 
 ## License

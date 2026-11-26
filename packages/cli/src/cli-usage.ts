@@ -28,7 +28,7 @@ Usage
   ${CLI_NAME} --snapshots ./snaps --repo owner/repo
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --interval 15m
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --fail-on-ttl-drop 20 --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
-  ${CLI_NAME} test-alert --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"
+  ${CLI_NAME} test-alert --alert-slack-webhook "$REDIS_DETECTIVE_SLACK_WEBHOOK"   # deprecated
   ${CLI_NAME} push --snapshots ./snaps --web-url https://app.example.com --instance <id> --token <token>
   ${CLI_NAME} watch --url redis://localhost:6379 --snapshots ./snaps --push --web-url https://app.example.com --instance <id> --token <token>
 
@@ -48,7 +48,10 @@ Commands
                           When --fail-on-* (or an alert config file) is set, each tick reuses
                           the same threshold comparison as the CI gate. A breach notifies the
                           configured channels once, then stays quiet until --alert-cooldown
-                          elapses or the condition clears (resolve).
+                          elapses or the condition clears (resolve). CLI channel delivery
+                          (Slack / webhook / PagerDuty) is deprecated in 0.7.x and planned for
+                          removal in 0.8 / 1.0; prefer redis-detective-web for hosted alerting.
+                          Sampling and watch --push are not deprecated.
                           With --push, upload the snapshot just taken to redis-detective-web
                           after each sample (private Redis path). A failed upload is reported
                           and the next sample still runs; redis-detective push sends anything
@@ -60,9 +63,11 @@ Commands
                           drops them. Requires --web-url, --instance, and --token (or
                           REDIS_DETECTIVE_WEB_URL / REDIS_DETECTIVE_INSTANCE /
                           REDIS_DETECTIVE_TOKEN). No Redis connection is opened.
-  test-alert              Send one sample notification per configured channel, so a webhook
-  alerts test             can be verified without waiting for a real breach. Same flags as
-                          watch for channels. Does not sample Redis.
+  test-alert              Deprecated in 0.7.x (removal planned for 0.8 / 1.0). Prefer the
+  alerts test             redis-detective-web test-alert. Still sends one sample notification
+                          per configured channel so a webhook can be verified without waiting
+                          for a real breach. Same flags as watch for channels. Does not
+                          sample Redis.
 
 Options
   -u, --url <url>         Redis connection URL. Defaults to $REDIS_URL.
@@ -158,40 +163,44 @@ Options
       --warn-only         Report crossed thresholds but still exit 0. Requires --snapshots.
                           Not used by watch (alerts have their own severity).
       --alert-slack-webhook <url>
-                          Slack incoming webhook. Env: REDIS_DETECTIVE_SLACK_WEBHOOK.
+                          Deprecated in 0.7.x (removal planned for 0.8 / 1.0). Slack
+                          incoming webhook. Env: REDIS_DETECTIVE_SLACK_WEBHOOK.
       --alert-webhook-url <url>
-                          Generic webhook. POST a versioned JSON payload (schemaVersion 1).
-                          Env: REDIS_DETECTIVE_WEBHOOK_URL.
+                          Deprecated in 0.7.x. Generic webhook. POST a versioned JSON
+                          payload (schemaVersion 1). Env: REDIS_DETECTIVE_WEBHOOK_URL.
       --alert-webhook-secret <secret>
-                          HMAC-SHA256 of the generic webhook body, sent as
-                          X-Redis-Detective-Signature: sha256=<hex>.
+                          Deprecated in 0.7.x. HMAC-SHA256 of the generic webhook body,
+                          sent as X-Redis-Detective-Signature: sha256=<hex>.
                           Env: REDIS_DETECTIVE_WEBHOOK_SECRET.
       --alert-pagerduty-routing-key <key>
-                          PagerDuty Events API v2 routing key. Env:
+                          Deprecated in 0.7.x. PagerDuty Events API v2 routing key. Env:
                           REDIS_DETECTIVE_PAGERDUTY_ROUTING_KEY. By default only critical
                           rules are sent (see --alert-pagerduty-min-severity).
       --alert-severity <level>
-                          Severity of the implicit CLI rule built from --fail-on-*
-                          (info, warning, critical). Default warning. File rules set their
-                          own. Env: REDIS_DETECTIVE_ALERT_SEVERITY.
+                          Deprecated in 0.7.x for watch channel delivery. Severity of the
+                          implicit CLI rule built from --fail-on-* (info, warning,
+                          critical). Default warning. File rules set their own. Env:
+                          REDIS_DETECTIVE_ALERT_SEVERITY. One-shot --fail-on-* CI gate is
+                          not deprecated.
       --alert-pagerduty-min-severity <level>
-                          Lowest severity that pages. Default critical.
-                          Env: REDIS_DETECTIVE_PAGERDUTY_MIN_SEVERITY.
+                          Deprecated in 0.7.x. Lowest severity that pages. Default
+                          critical. Env: REDIS_DETECTIVE_PAGERDUTY_MIN_SEVERITY.
       --alert-cooldown <dur>
-                          Re-notify interval for a persistent breach (45s, 15m, 2h, or
-                          seconds). Default 1h. 0 disables the cooldown.
+                          Deprecated in 0.7.x. Re-notify interval for a persistent breach
+                          (45s, 15m, 2h, or seconds). Default 1h. 0 disables the cooldown.
                           Env: REDIS_DETECTIVE_ALERT_COOLDOWN.
       --alert-config <file>
-                          JSON or YAML rules file (.redis-detective.json / .yaml).
-                          Env: REDIS_DETECTIVE_ALERT_CONFIG. Searched in the current
-                          directory when omitted.
+                          Deprecated in 0.7.x. JSON or YAML rules file
+                          (.redis-detective.json / .yaml). Env: REDIS_DETECTIVE_ALERT_CONFIG.
+                          Searched in the current directory when omitted.
       --alert-state-file <file>
-                          Where watch persists firing/resolved state so a restart does
-                          not re-page. Default: <snapshots>/.redis-detective-alerts.json.
-      --alert-dry-run     Print alert payloads instead of sending them.
+                          Deprecated in 0.7.x. Where watch persists firing/resolved state
+                          so a restart does not re-page. Default:
+                          <snapshots>/.redis-detective-alerts.json.
+      --alert-dry-run     Deprecated in 0.7.x. Print alert payloads instead of sending them.
       --alert-pagerduty-events-url <url>
-                          Override the PagerDuty Events API URL (tests / mock servers).
-                          Env: REDIS_DETECTIVE_PAGERDUTY_EVENTS_URL.
+                          Deprecated in 0.7.x. Override the PagerDuty Events API URL
+                          (tests / mock servers). Env: REDIS_DETECTIVE_PAGERDUTY_EVENTS_URL.
   -h, --help              Show this help.
   -V, --version           Show the version.
 

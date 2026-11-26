@@ -1,5 +1,36 @@
 # AGENTS.md — packages/alerts
 
+## Deprecation (0.7.x)
+
+CLI delivery of Slack / webhook / PagerDuty from `watch`, plus `test-alert` /
+`alerts test`, is **deprecated in 0.7.x** and planned for **removal in 0.8 / 1.0**.
+Prefer redis-detective-web for hosted alerting. This package still ships and must
+keep working for the rest of 0.7.x; do not delete it in a 0.7 patch.
+
+### Scheduled removal checklist (0.8 / 1.0)
+
+Delete or move out of the CLI / this package when the major lands:
+
+- Notifiers and HTTP: `slack-notifier.ts`, `webhook-notifier.ts`,
+  `pagerduty-notifier.ts`, `create-notifiers.ts`, `post-json-with-retry.ts`,
+  `alert-http.ts`, `sign-webhook-payload.ts`, and payload builders that exist only
+  to serve those notifiers if the CLI no longer uses them
+- CLI commands and flags: `test-alert` / `alerts test` (`command-from-argv.ts`,
+  `run-test-alert.ts`), `--alert-*` / `REDIS_DETECTIVE_SLACK_WEBHOOK` and friends
+  (`ALERT_ENV_VARS`), config-file loading for channels (`resolve-alert-config.ts`
+  channel parts, `examples/alerts/*` as CLI examples)
+- `afterTick` notifier dispatch in `runWatchCommand`; file state store
+  `.redis-detective-alerts.json` (`DEFAULT_ALERT_STATE_FILE_NAME`,
+  `create-file-alert-state-store.ts`)
+- `.github/workflows/alerts-e2e.yml` and `e2e/alerts-*.mjs` once there is no CLI
+  channel to test
+
+**Keep in `@redis-detective/core`:** `evaluateCiGate`, `evaluateAlertTick`,
+fingerprints, state-transition types, finding/rule types.
+
+**Keep in CLI:** `watch` as a sampler, `watch --push` / `push`, one-shot diagnosis,
+CI gate exit code.
+
 ## The rule
 
 This package turns **already-decided** alert events into notifications and owns the I/O around

@@ -1,6 +1,7 @@
 import { configuredChannels } from '@redis-detective/alerts';
 import type { ResolvedAlertConfig } from '@redis-detective/alerts';
 
+import { WATCH_ALERT_BANNER_DEPRECATION } from './cli-alerting-deprecation.js';
 import { formatDuration } from './format-bytes.js';
 
 export function formatWatchAlertBanner(
@@ -17,19 +18,21 @@ export function formatWatchAlertBanner(
     lines.push(
       'Alert channels are configured but no rules are armed. Pass --fail-on-* or add rules to --alert-config.',
     );
+    lines.push(WATCH_ALERT_BANNER_DEPRECATION);
     return lines;
   }
   if (channels.length === 0 && !config.dryRun) {
     lines.push(
       `Alert rules are armed (${config.rules.map((rule) => rule.id).join(', ')}) but no channel is configured. Add a webhook or use --alert-dry-run.`,
     );
+    lines.push(WATCH_ALERT_BANNER_DEPRECATION);
     return lines;
   }
 
   const channelList = channels.length === 0 ? 'dry-run only' : channels.join(', ');
   const cooldown = config.cooldownMs === 0 ? 'off' : formatDuration(config.cooldownMs / 1_000);
   lines.push(
-    `Alerts: ${channelList}. ${String(config.rules.length)} rule(s). Cooldown ${cooldown}.${config.dryRun ? ' Dry-run: payloads print instead of sending.' : ''}`,
+    `Alerts: ${channelList}. ${String(config.rules.length)} rule(s). Cooldown ${cooldown}.${config.dryRun ? ' Dry-run: payloads print instead of sending.' : ''} ${WATCH_ALERT_BANNER_DEPRECATION}`,
   );
   if (configPath !== null) {
     lines.push(`Alert config: ${configPath}`);

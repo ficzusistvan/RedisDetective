@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.1
+
+Deprecate CLI-hosted alerting UX while keeping it working through 0.7.x.
+
+### Deprecations
+
+- **`watch` Slack / webhook / PagerDuty delivery** and **`test-alert` / `alerts test`** print a
+  one-time stderr warning toward redis-detective-web. Removal is planned for 0.8 / 1.0; behaviour
+  and payloads are unchanged in 0.7.1.
+- Sampling, `watch --push` / `push`, and the one-shot CI `--fail-on-*` gate (exit 7) are **not**
+  deprecated.
+- `packages/alerts` remains in the workspace. `docs/alerts.md` and `packages/alerts/AGENTS.md`
+  list what a later major should delete.
+
+## 0.7.0
+
+Move alert decision math into `@redis-detective/core` (`evaluateAlertTick`, fingerprints,
+state transitions). Notifiers, HMAC, config, and state I/O stay in `packages/alerts`.
+
 ## 0.6.3
 
 Small wording fix for `@redis-detective/core` and `redis-detective`.

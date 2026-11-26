@@ -52,6 +52,8 @@ describe('test-alert against a local HTTP mock', () => {
       ]);
 
       assert.equal(result.code, 0, result.err || result.out);
+      assert.match(result.err, /Deprecated/);
+      assert.match(result.err, /test-alert/);
       assert.equal(server.posts.length, 3);
 
       const slack = server.posts.find((post) => post.path === '/slack');

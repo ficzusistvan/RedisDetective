@@ -38,9 +38,6 @@ importers:
       '@redis-detective/core':
         specifier: workspace:*
         version: link:../core
-      '@redis-detective/core-types':
-        specifier: workspace:*
-        version: link:../core-types
 
   packages/cli:
     dependencies:

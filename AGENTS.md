@@ -117,12 +117,14 @@ conclusion_, not about reporting observations.
   product debuggable.
 - **`packages/core` is pure analysis.** No `node:*`, no `fetch`, no `process.env`, no
   `Date.now()` / `Math.random()`, no `redis` / sampler / github-integration / alerts. The caller
-  passes `generatedAt` in. ESLint enforces this. Core depends on `core-types`, `evidence`, and
-  `reasoner` via `workspace:*`; its published build bundles them.
+  passes `generatedAt` / `nowMs` in. Alert decision math (`evaluateAlertTick`) lives here;
+  notifiers and I/O stay in `packages/alerts`. ESLint enforces this. Core depends on
+  `core-types`, `evidence`, and `reasoner` via `workspace:*`; its published build bundles them.
 - **Dependencies point inwards.** Everything may depend on `core-types`. `evidence` depends only
   on `core-types`. Dependency direction for analysis is `cli` → `core` → `{core-types, evidence,
-  reasoner}`. The CLI must import analysis from `@redis-detective/core`, not from `evidence`,
-  `reasoner`, or `core-types` directly. Nothing depends on `cli`.
+  reasoner}` (and `alerts` → `core` for decision types/re-exports). The CLI must import analysis
+  from `@redis-detective/core`, not from `evidence`, `reasoner`, or `core-types` directly.
+  Nothing depends on `cli`.
 - **Inject collaborators.** Redis clients, GitHub clients and LLM clients are narrow interfaces
   passed in as arguments (`RedisCommandClient`, `GitHubCommitSource`, `LlmClient`), never
   constructed inside the function that uses them. This is what makes the no-network test rule
@@ -224,14 +226,15 @@ The README is what npm users see. Keep it operator-facing; contributor and relea
 
 ## Current state
 
-Health check, sampler, evidence, `@redis-detective/core` (shared analysis + golden fixtures), CLI
-diagnosis, GitHub candidate lookup, the reasoner (deterministic paragraph, optional LLM wording
-behind the validator), and a programmatic library API on the published `redis-detective` package
-are implemented. The `watch` subcommand runs the diagnosis path on an interval into a local
-snapshot directory, with no commit lookup and no model call per tick. When thresholds and a
-channel are configured it reuses the CI gate comparison and notifies Slack, a generic webhook, or
-PagerDuty (`packages/alerts`) without spamming: firing → resolved, cooldown, persisted state.
-`test-alert` / `alerts test` sends one sample per channel. `push` uploads snapshots not yet
-accepted by that web instance, in batches under 4 MiB; `watch --push` uploads the snapshot it just
-took and keeps sampling if the upload fails. Both use an instance push token. See `docs/alerts.md`
-and `docs/mvp-scope.md`.
+Health check, sampler, evidence, `@redis-detective/core` (shared analysis + golden fixtures +
+pure alert decision / CI-gate math), CLI diagnosis, GitHub candidate lookup, the reasoner
+(deterministic paragraph, optional LLM wording behind the validator), and a programmatic library
+API on the published `redis-detective` package are implemented. The `watch` subcommand runs the
+diagnosis path on an interval into a local snapshot directory, with no commit lookup and no model
+call per tick. When thresholds and a channel are configured, core’s `evaluateAlertTick` decides
+notify / suppress / resolve; `packages/alerts` still owns notifiers, webhook HMAC, config files,
+and the state file (Slack, generic webhook, PagerDuty) without spamming. `test-alert` /
+`alerts test` sends one sample per channel. `push` uploads snapshots not yet accepted by that web
+instance, in batches under 4 MiB; `watch --push` uploads the snapshot it just took and keeps
+sampling if the upload fails. Both use an instance push token. Hosted alerting stays in
+`redis-detective-web`, not this repo. See `docs/alerts.md` and `docs/mvp-scope.md`.

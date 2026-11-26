@@ -35,7 +35,6 @@ import type { RedisConnection } from './create-redis-client.js';
 import { createGitHubCommitSource } from './create-github-commit-source.js';
 import type { ReadGhAuthToken } from './create-github-commit-source.js';
 import { createLlmClientFromEnv } from './create-llm-client-from-env.js';
-import { evaluateAlertRules } from './evaluate-alert-rules.js';
 import { evaluateCiGate, hasCiGateThresholds } from '@redis-detective/core';
 import type { CiGateResult } from '@redis-detective/core';
 import { EXIT_CODES } from './exit-codes.js';
@@ -443,7 +442,8 @@ async function runWatchCommand(context: MainContext, options: CliOptions): Promi
                   message: candidate.message.split('\n')[0] ?? candidate.message,
                 })),
               },
-              rules: evaluateAlertRules(report.snapshots, alertConfig.rules),
+              rules: alertConfig.rules,
+              snapshots: report.snapshots,
               store: alertStateStore,
               notifiers,
               writeLine: (line) => {

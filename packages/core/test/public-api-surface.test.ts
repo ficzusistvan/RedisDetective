@@ -20,6 +20,13 @@ const REQUIRED_VALUES = [
   'StoredSnapshotError',
   'EvidenceOptionsError',
   'SnapshotOrderingError',
+  'evaluateAlertTick',
+  'evaluateAlertRules',
+  'transitionAlertState',
+  'alertFingerprint',
+  'pagerdutyDedupKey',
+  'DEFAULT_ALERT_COOLDOWN_MS',
+  'IMPLICIT_CLI_RULE_ID',
 ] as const;
 
 describe('public API surface', () => {

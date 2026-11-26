@@ -157,9 +157,19 @@ Logs and payloads never include Redis passwords, Slack webhook paths,
 PagerDuty routing keys, HMAC secrets, or example key names. The host field is
 the same password-redacted URL the rest of the CLI already prints.
 
+## Decision vs delivery
+
+Threshold comparison and the firing → resolved / cooldown state machine live in
+`@redis-detective/core` (`evaluateAlertTick`, `transitionAlertState`). Fingerprints
+and PagerDuty `dedup_key` values are pure functions there so a restarted process
+can close an incident opened by an older CLI. `packages/alerts` owns notifiers,
+HTTP (including webhook HMAC), config-file parsing, and the state file.
+
 ## Adding a channel later
 
 Notifiers implement a small `Notifier` interface (`packages/alerts`). Paid
 channels (email, Teams, Opsgenie, a hosted dashboard) should use that seam.
 `isChannelEnabled` is the future license hook; it currently returns `true` for
-every shipping channel. Do not add a paywall here.
+every shipping channel. Do not add a paywall here. Core must not know about
+licences.
+

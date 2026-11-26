@@ -271,6 +271,12 @@ async function assertRuntimeExports() {
     'StoredSnapshotError',
     'EvidenceOptionsError',
     'SnapshotOrderingError',
+    'evaluateAlertTick',
+    'evaluateAlertRules',
+    'transitionAlertState',
+    'alertFingerprint',
+    'pagerdutyDedupKey',
+    'DEFAULT_ALERT_COOLDOWN_MS',
   ]) {
     if (api[name] === undefined) {
       fail(`Staged index.js is missing export ${name}.`);
@@ -283,6 +289,7 @@ function typecheckPublishedApi() {
   writeFileSync(
     consumerPath,
     `import {
+  DEFAULT_ALERT_COOLDOWN_MS,
   DIAGNOSIS_REPORT_SCHEMA_VERSION,
   DIAGNOSIS_REPORT_TYPE,
   EVIDENCE_DEFAULTS,
@@ -291,16 +298,23 @@ function typecheckPublishedApi() {
   SUPPORTED_SNAPSHOT_FILE_SCHEMA_VERSIONS,
   SnapshotOrderingError,
   StoredSnapshotError,
+  alertFingerprint,
   buildEvidenceGraph,
   diagnoseSnapshots,
+  evaluateAlertTick,
   explainEvidence,
+  pagerdutyDedupKey,
   parseStoredSnapshot,
   resolveEvidenceOptions,
   serializeSnapshotFile,
   snapshotFileName,
   toDiagnosisJson,
+  transitionAlertState,
 } from './index.js';
 import type {
+  AlertContext,
+  AlertRule,
+  AlertStateRecord,
   DiagnosisJson,
   EvidenceGraph,
   EvidenceOptions,
@@ -326,9 +340,23 @@ const diagnosis: Promise<DiagnosisJson> = diagnoseSnapshots({
   generatedAt: '2026-01-01T00:00:00.000Z',
   storeLocation: './snaps',
 });
+const context: AlertContext = { host: 'redis://localhost', likelyCause: null, commitHints: [] };
+const rules: readonly AlertRule[] = [];
+const previous: readonly AlertStateRecord[] = [];
+const alertTick = evaluateAlertTick({
+  host: 'redis://localhost',
+  occurredAt: '2026-01-01T00:00:00.000Z',
+  nowMs: 0,
+  cooldownMs: DEFAULT_ALERT_COOLDOWN_MS,
+  context,
+  rules,
+  snapshots,
+  previous,
+});
 
 void diagnosis;
 void explanation;
+void alertTick;
 void serializeSnapshotFile;
 void snapshotFileName;
 void parseStoredSnapshot;
@@ -341,6 +369,9 @@ void SUPPORTED_SNAPSHOT_FILE_SCHEMA_VERSIONS;
 void DIAGNOSIS_REPORT_SCHEMA_VERSION;
 void DIAGNOSIS_REPORT_TYPE;
 void EVIDENCE_DEFAULTS;
+void alertFingerprint;
+void pagerdutyDedupKey;
+void transitionAlertState;
 `,
   );
 

@@ -128,3 +128,52 @@ export { serializeCiGate } from './serialize-ci-gate.js';
 
 export { gradeFindingStrength, measuredFindingStrength } from './grade-finding-strength.js';
 export type { FindingStrengthInput } from './grade-finding-strength.js';
+
+export { ALERT_CHANNELS, isAlertChannel } from './alert-channel.js';
+export type { AlertChannel } from './alert-channel.js';
+
+export { ALERT_SEVERITIES, isAlertSeverity, severityMeetsMinimum } from './alert-severity.js';
+export type { AlertSeverity } from './alert-severity.js';
+
+export { ALERT_FINDING_KINDS } from './alert-finding.js';
+export type { AlertFinding, AlertFindingKind } from './alert-finding.js';
+
+export { findingIdentity, ruleAppliesToChannel } from './alert-rule.js';
+export type { AlertRule, AlertRuleThresholds, EvaluatedAlertRule } from './alert-rule.js';
+
+export type { AlertCommitHint, AlertContext, AlertLikelyCause } from './alert-context.js';
+
+export { ALERT_ACTIONS } from './alert-action.js';
+export type { AlertAction } from './alert-action.js';
+
+export type { AlertEvent } from './alert-event.js';
+
+export {
+  ALERT_PAYLOAD_SCHEMA_VERSION,
+  ALERT_STATE_SCHEMA_VERSION,
+  DEFAULT_ALERT_COOLDOWN_MS,
+  DEFAULT_ALERT_SEVERITY,
+  IMPLICIT_CLI_RULE_ID,
+} from './alert-defaults.js';
+
+export { alertFingerprint } from './alert-fingerprint.js';
+export type { AlertIdentity } from './alert-fingerprint.js';
+
+export { pagerdutyDedupKey } from './pagerduty-dedup-key.js';
+
+export { ALERT_STATUSES, ALERT_STATE_TRANSITIONS } from './alert-state-record.js';
+export type { AlertStateRecord, AlertStateTransition, AlertStatus } from './alert-state-record.js';
+
+export { transitionAlertState } from './transition-alert-state.js';
+export type { AlertStateDecision, TransitionAlertStateRequest } from './transition-alert-state.js';
+
+export { buildAlertEvent } from './build-alert-event.js';
+
+export { evaluateAlertRules } from './evaluate-alert-rules.js';
+
+export { evaluateAlertTick, reduceAlertTick } from './evaluate-alert-tick.js';
+export type {
+  AlertTickDecision,
+  EvaluateAlertTickInput,
+  EvaluateAlertTickResult,
+} from './evaluate-alert-tick.js';

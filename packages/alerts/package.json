@@ -2,7 +2,7 @@
   "name": "@redis-detective/alerts",
   "version": "0.0.0",
   "private": true,
-  "description": "Watch-loop alerting: state machine, payload builders, and channel notifiers.",
+  "description": "Watch-loop alerting: notifiers, config/state I/O, and thin wrappers around core decision math.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -21,6 +21,6 @@
     "lint": "eslint src test"
   },
   "dependencies": {
-    "@redis-detective/core-types": "workspace:*"
+    "@redis-detective/core": "workspace:*"
   }
 }

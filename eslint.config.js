@@ -116,7 +116,8 @@ export default tseslint.config(
             },
             {
               name: '@redis-detective/alerts',
-              message: 'packages/core is analysis only; alerts belong in the CLI.',
+              message:
+                'notifiers and I/O stay out of core; decision logic lives here — do not import @redis-detective/alerts.',
             },
           ],
         },

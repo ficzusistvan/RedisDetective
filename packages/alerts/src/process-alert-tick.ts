@@ -1,13 +1,11 @@
-import type { AlertContext } from './alert-context.js';
-import { buildAlertEvent } from './build-alert-event.js';
+import type { AlertContext, AlertStateRecord, EvaluatedAlertRule, RedisSnapshot } from '@redis-detective/core';
+import { evaluateAlertTick, reduceAlertTick } from '@redis-detective/core';
+import type { AlertRule } from '@redis-detective/core';
+
 import { dispatchAlertEvent, notifiedChannelsOf } from './dispatch-alert-event.js';
-import type { AlertFinding } from './alert-finding.js';
 import { formatAlertLine } from './format-alert-line.js';
 import type { Notifier } from './notifier.js';
-import type { EvaluatedAlertRule } from './alert-rule.js';
-import type { AlertStateRecord } from './alert-state-record.js';
 import type { AlertStateStore } from './alert-state-store.js';
-import { transitionAlertState } from './transition-alert-state.js';
 
 export interface ProcessAlertTickRequest {
   readonly host: string;
@@ -15,10 +13,16 @@ export interface ProcessAlertTickRequest {
   readonly nowMs: number;
   readonly cooldownMs: number;
   readonly context: AlertContext;
-  readonly rules: readonly EvaluatedAlertRule[];
   readonly store: AlertStateStore;
   readonly notifiers: readonly Notifier[];
   readonly writeLine: (line: string) => void;
+  /**
+   * Prefer `rules` + `snapshots` (CI-gate evaluation in core). `evaluatedRules` remains for
+   * unit tests that inject findings without building snapshots.
+   */
+  readonly rules?: readonly AlertRule[];
+  readonly snapshots?: readonly RedisSnapshot[];
+  readonly evaluatedRules?: readonly EvaluatedAlertRule[];
 }
 
 export interface ProcessAlertTickResult {
@@ -28,6 +32,9 @@ export interface ProcessAlertTickResult {
 
 /**
  * Compare this tick's findings to persisted state, notify, and save.
+ *
+ * Decision math lives in `@redis-detective/core` (`evaluateAlertTick` / `reduceAlertTick`).
+ * This wrapper owns load/save/dispatch only.
  *
  * Load/save/notify failures are reported as lines and never thrown, so a broken webhook
  * or a locked state file cannot stop `watch` from sampling.
@@ -46,112 +53,62 @@ export async function processAlertTick(
     previousRecords = [];
   }
 
-  const byFingerprint = new Map(previousRecords.map((record) => [record.fingerprint, record]));
-  const seen = new Set<string>();
-  const nextRecords = new Map(byFingerprint);
-
-  for (const evaluated of request.rules) {
-    for (const finding of evaluated.findings) {
-      const event = buildAlertEvent(
-        'firing',
-        request.occurredAt,
-        request.host,
-        evaluated.rule,
-        finding,
-        request.context,
-      );
-      seen.add(event.fingerprint);
-      const decision = transitionAlertState({
-        previous: byFingerprint.get(event.fingerprint) ?? null,
-        firing: true,
-        nowMs: request.nowMs,
-        cooldownMs: request.cooldownMs,
-        occurredAt: request.occurredAt,
-        template: {
-          fingerprint: event.fingerprint,
-          dedupKey: event.dedupKey,
+  const decided =
+    request.evaluatedRules !== undefined
+      ? reduceAlertTick({
           host: request.host,
-          pattern: finding.pattern,
-          ruleId: evaluated.rule.id,
-          kind: finding.kind,
-          lastFinding: finding,
-        },
-      });
+          occurredAt: request.occurredAt,
+          nowMs: request.nowMs,
+          cooldownMs: request.cooldownMs,
+          context: request.context,
+          rules: request.evaluatedRules,
+          previous: previousRecords,
+        })
+      : evaluateAlertTick({
+          host: request.host,
+          occurredAt: request.occurredAt,
+          nowMs: request.nowMs,
+          cooldownMs: request.cooldownMs,
+          context: request.context,
+          rules: request.rules ?? [],
+          snapshots: request.snapshots ?? [],
+          previous: previousRecords,
+        });
 
-      const results =
-        decision.transition === 'notify-firing' || decision.transition === 'renotify'
-          ? await dispatchAlertEvent(event, request.notifiers)
-          : [];
-      if (decision.next !== null) {
-        const notified =
-          results.length === 0
-            ? decision.next.notifiedChannels
-            : uniqueChannels([...decision.next.notifiedChannels, ...notifiedChannelsOf(results)]);
-        nextRecords.set(event.fingerprint, { ...decision.next, notifiedChannels: notified });
-      }
-      const line = formatAlertLine(decision.transition, event, results);
-      if (line !== null) {
-        lines.push(line);
-      }
-      for (const result of results) {
-        if (result.dryRunBody !== null) {
-          lines.push(`--- alert dry-run ${result.channel} ---`);
-          lines.push(result.dryRunBody);
-        }
-        if (result.error !== null && !result.ok) {
-          lines.push(`alert ${result.channel} failed: ${result.error}`);
-        }
-      }
-    }
-  }
+  const nextRecords = new Map(
+    decided.nextState.map((record) => [record.fingerprint, record] as const),
+  );
 
-  for (const record of previousRecords) {
-    if (record.status !== 'firing' || seen.has(record.fingerprint)) {
+  for (const decision of decided.events) {
+    if (decision.event === null) {
+      const stateOnly = decision.stateOnlyResolve;
+      if (stateOnly !== undefined) {
+        lines.push(
+          `alert resolved  ${stateOnly.pattern}  ${stateOnly.kind}  (state only; rule no longer configured)`,
+        );
+      }
       continue;
     }
-    const finding = record.lastFinding ?? syntheticFindingFromRecord(record);
-    const rule = request.rules.find((entry) => entry.rule.id === record.ruleId)?.rule;
-    if (rule === undefined || finding === null) {
-      nextRecords.set(record.fingerprint, {
-        ...record,
-        status: 'resolved',
-        lastResolvedAt: request.occurredAt,
-      });
-      lines.push(
-        `alert resolved  ${record.pattern}  ${record.kind}  (state only; rule no longer configured)`,
-      );
-      continue;
-    }
-    const event = buildAlertEvent(
-      'resolved',
-      request.occurredAt,
-      request.host,
-      rule,
-      finding,
-      request.context,
-    );
-    const decision = transitionAlertState({
-      previous: record,
-      firing: false,
-      nowMs: request.nowMs,
-      cooldownMs: request.cooldownMs,
-      occurredAt: request.occurredAt,
-      template: {
-        fingerprint: record.fingerprint,
-        dedupKey: record.dedupKey,
-        host: record.host,
-        pattern: record.pattern,
-        ruleId: record.ruleId,
-        kind: record.kind,
-      },
-    });
+
+    const event = decision.event;
     const results =
+      decision.transition === 'notify-firing' ||
+      decision.transition === 'renotify' ||
       decision.transition === 'notify-resolved'
         ? await dispatchAlertEvent(event, request.notifiers)
         : [];
-    if (decision.next !== null) {
-      nextRecords.set(record.fingerprint, decision.next);
+
+    const current = nextRecords.get(event.fingerprint);
+    if (current !== undefined && results.length > 0) {
+      nextRecords.set(event.fingerprint, {
+        ...current,
+        notifiedChannels: uniqueChannels([
+          ...current.notifiedChannels,
+          ...notifiedChannelsOf(results),
+        ]),
+      });
     }
+
     const line = formatAlertLine(decision.transition, event, results);
     if (line !== null) {
       lines.push(line);
@@ -182,41 +139,6 @@ export async function processAlertTick(
     request.writeLine(line);
   }
   return { lines, records };
-}
-
-function syntheticFindingFromRecord(record: AlertStateRecord): AlertFinding | null {
-  switch (record.kind) {
-    case 'pattern-growth':
-      return {
-        kind: 'pattern-growth',
-        pattern: record.pattern,
-        bytesBefore: 0,
-        bytesAfter: 0,
-        bytesGrowth: 0,
-        percentGrowth: null,
-        growthPercentThreshold: null,
-        growthBytesThreshold: null,
-      };
-    case 'ttl-coverage-drop':
-      return {
-        kind: 'ttl-coverage-drop',
-        pattern: record.pattern,
-        ttlCoverageBefore: 0,
-        ttlCoverageAfter: 0,
-        dropPoints: 0,
-        thresholdPoints: 0,
-      };
-    case 'new-untimed-pattern':
-      return {
-        kind: 'new-untimed-pattern',
-        pattern: record.pattern,
-        ttlCoverageAfter: 0,
-        estimatedBytes: 0,
-        estimatedKeyCount: 0,
-      };
-    default:
-      return null;
-  }
 }
 
 function uniqueChannels(
